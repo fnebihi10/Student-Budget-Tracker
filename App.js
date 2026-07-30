@@ -1,22 +1,23 @@
-// App.js
-import 'react-native-gesture-handler';
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import AppNavigator from './src/navigation/AppNavigator';
-import { TransactionProvider } from './src/data/TransactionContext';
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { BudgetProvider } from "./src/context/BudgetContext";
+import { GoalsProvider } from "./src/context/GoalsContext";
+import { SplitsProvider } from "./src/context/SplitsContext";
+import { SubscriptionsProvider } from "./src/context/SubscriptionsContext";
+import AppNavigator from "./src/navigation/AppNavigator";
 
 export default function App() {
   return (
-    <TransactionProvider>
-      <NavigationContainer>
-        <AppNavigator />
-      </NavigationContainer>
-    </TransactionProvider>
+    <BudgetProvider>
+      <SubscriptionsProvider>
+        <GoalsProvider>
+          <SplitsProvider>
+            <NavigationContainer>
+              <AppNavigator />
+            </NavigationContainer>
+          </SplitsProvider>
+        </GoalsProvider>
+      </SubscriptionsProvider>
+    </BudgetProvider>
   );
 }
-
-
-
-
-
-

@@ -1,147 +1,370 @@
-import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
+import { Ionicons } from "@expo/vector-icons";
+import React, { useContext, useMemo, useState } from "react";
+import {
   Alert,
-  SafeAreaView,
-  ScrollView,
   Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
   TextInput,
+  View,
 } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from "../services/firebase";
-import { signOut } from "firebase/auth";
-import { useTransactions } from '../data/TransactionContext'; // Import this for the "fire" budget bar
+import { SafeAreaView } from "react-native-safe-area-context";
+import AppButton from "../components/AppButton";
+import { BudgetContext } from "../context/BudgetContext";
+import { GoalsContext } from "../context/GoalsContext";
+import { SplitsContext } from "../context/SplitsContext";
+import { SubscriptionsContext } from "../context/SubscriptionsContext";
+import { colors, radius, shadow, type } from "../design";
+import { formatMoney } from "../utils/formatters";
+import { goalTotals } from "../utils/goals";
+import { activeSubscriptionTotal } from "../utils/subscriptions";
 
-const STORAGE_KEY_LIMIT = 'USER_MONTHLY_LIMIT';
+const currencies = ["EUR", "USD", "GBP", "HUF"];
 
-export default function ProfileScreen() {
-  const user = auth.currentUser;
-  const { totalExpenses, formatCurrency } = useTransactions();
-  
-  const [monthlyLimit, setMonthlyLimit] = useState(120);
-  const [showLimitModal, setShowLimitModal] = useState(false);
-  const [newLimitInput, setNewLimitInput] = useState("");
+export default function ProfileScreen({ navigation }) {
+  const {
+    profile,
+    settings,
+    updateSettings,
+    updateProfile,
+    logout,
+    transactions,
+    bills,
+  } = useContext(BudgetContext);
+  const { subscriptions } = useContext(SubscriptionsContext);
+  const { goals } = useContext(GoalsContext);
+  const { splits } = useContext(SplitsContext);
+  const [showProfile, setShowProfile] = useState(false);
+  const [name, setName] = useState(profile.name);
+  const [school, setSchool] = useState(profile.school);
+  const [budget, setBudget] = useState(String(settings.monthlyBudget));
+  const saved = useMemo(() => goalTotals(goals).saved, [goals]);
+  const recurring = useMemo(
+    () => activeSubscriptionTotal(subscriptions),
+    [subscriptions]
+  );
 
-  // Calculate percentage for the budget bar
-  const spentPercentage = Math.min((totalExpenses / monthlyLimit) * 100, 100);
-
-  useEffect(() => {
-    const loadLimit = async () => {
-      try {
-        const savedLimit = await AsyncStorage.getItem(STORAGE_KEY_LIMIT);
-        if (savedLimit) setMonthlyLimit(parseFloat(savedLimit));
-      } catch (e) {
-        console.log("Failed to load limit:", e);
-      }
-    };
-    loadLimit();
-  }, []);
-
-  const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive", onPress: () => signOut(auth) },
-    ]);
+  const saveProfile = () => {
+    updateProfile({ name: name.trim(), school: school.trim() });
+    updateSettings({
+      monthlyBudget:
+        Number(budget.replace(",", ".")) || settings.monthlyBudget,
+    });
+    setShowProfile(false);
   };
 
-  const saveNewLimit = async () => {
-    const newLimit = parseFloat(newLimitInput);
-    if (isNaN(newLimit) || newLimit <= 0) {
-      Alert.alert("Error", "Please enter a valid amount");
-      return;
-    }
-    setMonthlyLimit(newLimit);
-    setShowLimitModal(false);
-    await AsyncStorage.setItem(STORAGE_KEY_LIMIT, newLimit.toString());
-  };
+  const confirmLogout = () =>
+    Alert.alert(
+      "Sign out of Pocketwise?",
+      "Your budgets, subscriptions, and goals will stay safely on this device. This local profile does not use a password or cloud account yet.",
+      [
+        { text: "Stay signed in", style: "cancel" },
+        { text: "Sign out", onPress: logout },
+      ]
+    );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        
-        {/* Profile Header */}
+    <SafeAreaView edges={["top"]} style={styles.safe}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.email?.charAt(0).toUpperCase() || "U"}</Text>
+          <View>
+            <Text style={styles.eyebrow}>YOUR POCKETWISE</Text>
+            <Text style={styles.title}>Profile & tools</Text>
           </View>
-          <Text style={styles.email}>{user?.email || "user@example.com"}</Text>
+          <Pressable
+            onPress={() => setShowProfile(true)}
+            style={styles.headerEdit}
+          >
+            <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+          </Pressable>
         </View>
 
-        {/* The "Fire" Monthly Limit Card */}
-        <View style={styles.limitCard}>
-          <Text style={styles.limitAmount}>{formatCurrency(monthlyLimit)}</Text>
-          <Text style={styles.limitLabel}>Monthly Spending Limit</Text>
-          
-          {/* Progress Bar added here */}
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${spentPercentage}%`, backgroundColor: spentPercentage > 90 ? '#ff4444' : '#2979ff' }]} />
+        <View style={styles.identity}>
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(profile.name || "P")[0].toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.onlineDot} />
           </View>
-          <Text style={styles.progressSubtext}>
-            {spentPercentage.toFixed(0)}% of budget used
-          </Text>
-
-          <TouchableOpacity style={styles.limitButton} onPress={() => {setNewLimitInput(monthlyLimit.toString()); setShowLimitModal(true);}}>
-            <Text style={styles.limitButtonText}>Adjust Budget</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Settings Section - Cleaned up */}
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <View style={styles.settingsList}>
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Theme</Text>
-            <Text style={styles.settingValue}>Light</Text>
-          </View>
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Language</Text>
-            <Text style={styles.settingValue}>English</Text>
+          <View style={styles.identityCopy}>
+            <Text style={styles.name}>{profile.name || "Pocketwise student"}</Text>
+            <Text style={styles.school}>
+              {profile.school || "Add your university or school"}
+            </Text>
+            <View style={styles.localPill}>
+              <Ionicons
+                name="phone-portrait-outline"
+                size={11}
+                color={colors.primary}
+              />
+              <Text style={styles.localText}>Private local profile</Text>
+            </View>
           </View>
         </View>
 
-        {/* Support Section - Kept your exact Alert logic */}
-        <Text style={styles.sectionTitle}>Support</Text>
-        <View style={styles.supportList}>
-          <TouchableOpacity style={styles.supportItem} onPress={() => Alert.alert("Help Center", "Opening help articles...")}>
-            <Text style={styles.supportText}>Help Center</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.supportItem} onPress={() => Alert.alert("Terms & Privacy", "Showing terms and privacy policy...")}>
-            <Text style={styles.supportText}>Terms & Privacy</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.supportItem} onPress={() => Alert.alert("Rate App", "Thank you for the rating!")}>
-            <Text style={styles.supportText}>Rate App</Text>
-          </TouchableOpacity>
+        <View style={styles.snapshot}>
+          <Snapshot
+            icon="receipt-outline"
+            label="Entries"
+            value={String(transactions.length)}
+            color={colors.blue}
+          />
+          <Snapshot
+            icon="repeat-outline"
+            label="Monthly"
+            value={formatMoney(recurring, settings.currency, true)}
+            color={colors.lavender}
+          />
+          <Snapshot
+            icon="flag-outline"
+            label="Goal savings"
+            value={formatMoney(saved, settings.currency, true)}
+            color={colors.primary}
+          />
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Money tools</Text>
+          <Text style={styles.sectionHint}>Everything in one place</Text>
+        </View>
+        <View style={styles.toolGrid}>
+          <ToolCard
+            icon="grid"
+            title="Student Hub"
+            subtitle="Calendar, coach & splits"
+            color="#7759A6"
+            onPress={() => navigation.navigate("StudentHub")}
+          />
+          <ToolCard
+            icon="calendar"
+            title="Money calendar"
+            subtitle="See every money date"
+            color="#D28A43"
+            onPress={() => navigation.navigate("MoneyCalendar")}
+          />
+          <ToolCard
+            icon="people"
+            title="Split costs"
+            subtitle={`${
+              splits.filter((item) => item.status !== "settled").length
+            } open`}
+            color="#D16F77"
+            onPress={() => navigation.navigate("Splits")}
+          />
+          <ToolCard
+            icon="pulse"
+            title="Smart coach"
+            subtitle="Your financial health"
+            color="#3F9B82"
+            onPress={() => navigation.navigate("Coach")}
+          />
+          <ToolCard
+            icon="flag"
+            title="Savings goals"
+            subtitle={`${goals.length} goal${goals.length === 1 ? "" : "s"}`}
+            color="#4FA982"
+            onPress={() => navigation.navigate("Goals")}
+          />
+          <ToolCard
+            icon="repeat"
+            title="Subscriptions"
+            subtitle={`${subscriptions.length} tracked`}
+            color="#5D82D8"
+            onPress={() => navigation.navigate("Subscriptions")}
+          />
+          <ToolCard
+            icon="sparkles"
+            title="Pocketwise Pro"
+            subtitle="Explore features"
+            color="#9A75D5"
+            onPress={() => navigation.navigate("Subscription")}
+          />
+          <ToolCard
+            icon="shield-checkmark"
+            title="Privacy & data"
+            subtitle="Export or manage"
+            color="#D17B65"
+            onPress={() => navigation.navigate("Privacy")}
+          />
+        </View>
 
-        <View style={{height: 40}} />
+        <Text style={styles.sectionTitle}>Plan preferences</Text>
+        <View style={styles.card}>
+          <SettingRow
+            icon="wallet-outline"
+            title="Monthly plan"
+            subtitle={formatMoney(
+              settings.monthlyBudget,
+              settings.currency
+            )}
+            onPress={() => setShowProfile(true)}
+          />
+          <View style={styles.divider} />
+          <View style={styles.settingRow}>
+            <View style={styles.settingIcon}>
+              <Ionicons
+                name="cash-outline"
+                size={19}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.settingCopy}>
+              <Text style={styles.settingTitle}>Currency</Text>
+              <Text style={styles.settingSubtitle}>Used for every amount</Text>
+            </View>
+            <View style={styles.currencyRow}>
+              {currencies.map((currency) => (
+                <Pressable
+                  key={currency}
+                  onPress={() => updateSettings({ currency })}
+                  style={[
+                    styles.currency,
+                    settings.currency === currency && styles.currencyActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.currencyText,
+                      settings.currency === currency &&
+                        styles.currencyTextActive,
+                    ]}
+                  >
+                    {currency}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.settingRow}>
+            <View style={styles.settingIcon}>
+              <Ionicons
+                name="notifications-outline"
+                size={19}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.settingCopy}>
+              <Text style={styles.settingTitle}>Budget reminders</Text>
+              <Text style={styles.settingSubtitle}>
+                Preference saved for future check-ins
+              </Text>
+            </View>
+            <View style={styles.switchWrap}>
+              <Switch
+                value={settings.notifications}
+                onValueChange={(notifications) =>
+                  updateSettings({ notifications })
+                }
+                trackColor={{ false: colors.line, true: colors.primary }}
+                thumbColor={colors.surface}
+                style={styles.switch}
+              />
+            </View>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.card}>
+          <SettingRow
+            icon="person-outline"
+            title="Personal details"
+            subtitle="Name, school, and monthly plan"
+            onPress={() => setShowProfile(true)}
+          />
+          <View style={styles.divider} />
+          <SettingRow
+            icon="calendar-outline"
+            title="Upcoming commitments"
+            subtitle={`${bills.filter((bill) => !bill.paid).length} bills and ${
+              subscriptions.filter((item) => item.status === "active").length
+            } subscriptions`}
+            onPress={() => navigation.navigate("Budgets")}
+          />
+          <View style={styles.divider} />
+          <SettingRow
+            icon="help-circle-outline"
+            title="About Pocketwise"
+            subtitle="Privacy, version, and project status"
+            onPress={() => navigation.navigate("Privacy")}
+          />
+        </View>
+
+        <Pressable onPress={confirmLogout} style={styles.logout}>
+          <View style={styles.logoutIcon}>
+            <Ionicons name="log-out-outline" size={19} color={colors.primary} />
+          </View>
+          <View style={styles.logoutCopy}>
+            <Text style={styles.logoutTitle}>Sign out</Text>
+            <Text style={styles.logoutText}>
+              Keep all local data and return to the welcome screen
+            </Text>
+          </View>
+          <Ionicons name="arrow-forward" size={19} color={colors.primary} />
+        </Pressable>
+
+        <Text style={styles.footer}>
+          Pocketwise · Private by default · Version 1.0.0
+        </Text>
       </ScrollView>
 
-      {/* Edit Limit Modal */}
-      <Modal visible={showLimitModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Set Monthly Limit</Text>
+      <Modal
+        visible={showProfile}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowProfile(false)}
+      >
+        <View style={styles.modalShade}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowProfile(false)}
+          />
+          <View style={styles.modal}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Personal details</Text>
+            <Text style={styles.modalSubtitle}>
+              Keep your plan personal and realistic.
+            </Text>
+            <Text style={styles.inputLabel}>First name</Text>
             <TextInput
-              style={styles.modalInput}
-              keyboardType="decimal-pad"
-              value={newLimitInput}
-              onChangeText={setNewLimitInput}
-              autoFocus={true}
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
+              placeholderTextColor={colors.soft}
+              style={styles.input}
             />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setShowLimitModal(false)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={saveNewLimit}>
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.inputLabel}>School</Text>
+            <TextInput
+              value={school}
+              onChangeText={setSchool}
+              placeholder="Optional"
+              placeholderTextColor={colors.soft}
+              style={styles.input}
+            />
+            <Text style={styles.inputLabel}>Monthly plan</Text>
+            <TextInput
+              value={budget}
+              onChangeText={(value) =>
+                setBudget(value.replace(/[^0-9.,]/g, ""))
+              }
+              keyboardType="decimal-pad"
+              placeholderTextColor={colors.soft}
+              style={styles.input}
+            />
+            <AppButton
+              title="Save changes"
+              onPress={saveProfile}
+              disabled={!name.trim() || !Number(budget.replace(",", "."))}
+              style={styles.save}
+            />
           </View>
         </View>
       </Modal>
@@ -149,47 +372,328 @@ export default function ProfileScreen() {
   );
 }
 
+function Snapshot({ icon, label, value, color }) {
+  return (
+    <View style={styles.snapshotItem}>
+      <View style={[styles.snapshotIcon, { backgroundColor: `${color}20` }]}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <Text numberOfLines={1} style={styles.snapshotValue}>
+        {value}
+      </Text>
+      <Text style={styles.snapshotLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ToolCard({ icon, title, subtitle, color, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.toolCard,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={[styles.toolIcon, { backgroundColor: `${color}20` }]}>
+        <Ionicons name={icon} size={21} color={color} />
+      </View>
+      <Text style={styles.toolTitle}>{title}</Text>
+      <Text style={styles.toolSubtitle}>{subtitle}</Text>
+      <View style={styles.toolArrow}>
+        <Ionicons name="arrow-forward" size={15} color={colors.primary} />
+      </View>
+    </Pressable>
+  );
+}
+
+function SettingRow({ icon, title, subtitle, onPress }) {
+  return (
+    <Pressable
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.settingRow,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={styles.settingIcon}>
+        <Ionicons name={icon} size={19} color={colors.primary} />
+      </View>
+      <View style={styles.settingCopy}>
+        <Text style={styles.settingTitle}>{title}</Text>
+        <Text style={styles.settingSubtitle}>{subtitle}</Text>
+      </View>
+      {onPress ? (
+        <Ionicons name="chevron-forward" size={20} color={colors.soft} />
+      ) : null}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
-  container: { flex: 1, padding: 20 },
-  header: { alignItems: 'center', marginBottom: 30, marginTop: 10 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#2979ff', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  avatarText: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
-  email: { fontSize: 18, color: '#2c3e50', fontWeight: '500' },
-  
-  // Limit Card Styles
-  limitCard: { backgroundColor: '#f8f9fa', padding: 24, borderRadius: 20, alignItems: 'center', marginBottom: 25, borderWidth: 1, borderColor: '#eee' },
-  limitAmount: { fontSize: 36, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 },
-  limitLabel: { fontSize: 14, color: '#666', marginBottom: 15 },
-  progressBarBg: { width: '100%', height: 8, backgroundColor: '#e9ecef', borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
-  progressBarFill: { height: '100%', borderRadius: 4 },
-  progressSubtext: { fontSize: 12, color: '#999', marginBottom: 15 },
-  limitButton: { backgroundColor: '#e3f2fd', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-  limitButtonText: { color: '#2979ff', fontWeight: '600' },
-
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#abb2b9', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
-  settingsList: { backgroundColor: '#f8f9fa', borderRadius: 12, paddingHorizontal: 16, marginBottom: 25 },
-  settingItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  settingLabel: { fontSize: 16, color: '#2c3e50' },
-  settingValue: { fontSize: 16, color: '#999' },
-
-  supportList: { backgroundColor: '#f8f9fa', borderRadius: 12, paddingHorizontal: 16, marginBottom: 25 },
-  supportItem: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  supportText: { fontSize: 16, color: '#2c3e50' },
-
-  logoutButton: { backgroundColor: '#fff', padding: 18, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#ff4444' },
-  logoutButtonText: { color: '#ff4444', fontSize: 16, fontWeight: 'bold' },
-
-  // Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: 'white', borderRadius: 20, padding: 25 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  modalInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 15, fontSize: 24, textAlign: 'center', marginBottom: 20, backgroundColor: '#f9f9f9' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  modalButton: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', marginHorizontal: 5 },
-  cancelButton: { backgroundColor: '#f2f2f2' },
-  saveButton: { backgroundColor: '#2979ff' },
-  saveButtonText: { color: '#fff', fontWeight: 'bold' },
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 110 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 13,
+    paddingBottom: 16,
+  },
+  eyebrow: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  title: { ...type.h1, marginTop: 2, letterSpacing: -0.7 },
+  headerEdit: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: colors.mint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  identity: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primaryDark,
+    borderRadius: radius.xl,
+    padding: 18,
+    ...shadow,
+  },
+  avatarWrap: { marginRight: 14 },
+  avatar: {
+    width: 62,
+    height: 62,
+    borderRadius: 22,
+    backgroundColor: colors.lime,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    color: colors.primaryDark,
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  onlineDot: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: "#63C391",
+    borderWidth: 3,
+    borderColor: colors.primaryDark,
+  },
+  identityCopy: { flex: 1 },
+  name: { color: colors.surface, fontSize: 19, fontWeight: "900" },
+  school: { color: "#BFD0C8", fontSize: 11, marginTop: 4 },
+  localPill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.mint,
+    borderRadius: 99,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginTop: 9,
+  },
+  localText: { color: colors.primary, fontSize: 8, fontWeight: "800" },
+  snapshot: { flexDirection: "row", gap: 9, marginTop: 11 },
+  snapshotItem: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 11,
+  },
+  snapshotIcon: {
+    width: 29,
+    height: 29,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  snapshotValue: { color: colors.ink, fontSize: 13, fontWeight: "900" },
+  snapshotLabel: { color: colors.muted, fontSize: 9, marginTop: 2 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 25,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 25,
+    marginBottom: 10,
+  },
+  sectionHint: { color: colors.muted, fontSize: 9 },
+  toolGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 9,
+  },
+  toolCard: {
+    width: "48.7%",
+    minHeight: 133,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 13,
+  },
+  pressed: { opacity: 0.65 },
+  toolIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toolTitle: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 10,
+  },
+  toolSubtitle: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  toolArrow: {
+    position: "absolute",
+    right: 11,
+    top: 13,
+    width: 27,
+    height: 27,
+    borderRadius: 10,
+    backgroundColor: colors.mint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  settingRow: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  settingIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: colors.mint,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  settingCopy: { flex: 1, paddingRight: 8, justifyContent: "center" },
+  settingTitle: { color: colors.ink, fontSize: 13, fontWeight: "800" },
+  settingSubtitle: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  divider: { height: 1, backgroundColor: colors.line, marginLeft: 48 },
+  currencyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
+    gap: 2,
+  },
+  currency: {
+    minWidth: 29,
+    paddingVertical: 7,
+    borderRadius: 9,
+    alignItems: "center",
+  },
+  currencyActive: { backgroundColor: colors.primary },
+  currencyText: { color: colors.muted, fontSize: 8, fontWeight: "800" },
+  currencyTextActive: { color: colors.surface },
+  switchWrap: {
+    height: 72,
+    minWidth: 53,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  switch: { transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] },
+  logout: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.mint,
+    borderRadius: radius.lg,
+    padding: 14,
+    marginTop: 17,
+  },
+  logoutIcon: {
+    width: 41,
+    height: 41,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  logoutCopy: { flex: 1 },
+  logoutTitle: { color: colors.primaryDark, fontSize: 13, fontWeight: "900" },
+  logoutText: {
+    color: colors.primaryDark,
+    fontSize: 9,
+    marginTop: 3,
+  },
+  footer: {
+    color: colors.soft,
+    fontSize: 9,
+    textAlign: "center",
+    marginTop: 23,
+  },
+  modalShade: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(14,29,21,0.42)",
+  },
+  modal: {
+    backgroundColor: colors.canvas,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 21,
+    paddingTop: 10,
+    paddingBottom: 30,
+  },
+  modalHandle: {
+    width: 42,
+    height: 5,
+    borderRadius: 9,
+    backgroundColor: colors.line,
+    alignSelf: "center",
+    marginBottom: 18,
+  },
+  modalTitle: { color: colors.ink, fontSize: 20, fontWeight: "900" },
+  modalSubtitle: { color: colors.muted, fontSize: 11, marginTop: 4 },
+  inputLabel: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 13,
+    marginBottom: 7,
+  },
+  input: {
+    minHeight: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 14,
+    color: colors.ink,
+  },
+  save: { marginTop: 20 },
 });
-
-
