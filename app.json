@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Pocketwise",
+    "slug": "pocketwise-student-budget",
+    "scheme": "pocketwise",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/pocketwise-icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/pocketwise-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#173F30"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.pocketwise.studentbudget"
+    },
+    "android": {
+      "package": "app.pocketwise.studentbudget",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/pocketwise-icon.png",
+        "backgroundColor": "#173F30"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/pocketwise-icon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}
