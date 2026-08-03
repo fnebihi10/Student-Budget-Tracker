@@ -14,6 +14,7 @@ import { categoryById } from "../data/categories";
 import { colors, radius, shadow, type } from "../design";
 import { getTotals } from "../utils/calculations";
 import { formatMoney, monthLabel } from "../utils/formatters";
+import { isBillPaidForMonth } from "../utils/dates";
 
 export default function DashboardScreen({ navigation }) {
   const { transactions, bills, profile, settings, toggleBill } = useContext(BudgetContext);
@@ -38,7 +39,7 @@ export default function DashboardScreen({ navigation }) {
   const weeklySafe = Math.max(0, (remaining / daysLeft) * 7);
   const progress = Math.min((totals.expenses / Math.max(settings.monthlyBudget, 1)) * 100, 100);
   const nextBill = bills
-    .filter((bill) => !bill.paid)
+    .filter((bill) => !isBillPaidForMonth(bill))
     .sort((a, b) => a.dueDay - b.dueDay)[0];
 
   return (
@@ -212,7 +213,7 @@ function SummaryCard({ icon, label, value, color }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: 18, paddingBottom: 122 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 122 },
   header: {
     flexDirection: "row",
     alignItems: "center",

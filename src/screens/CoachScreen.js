@@ -6,7 +6,6 @@ import Svg, { Circle } from "react-native-svg";
 import { BudgetContext } from "../context/BudgetContext";
 import { GoalsContext } from "../context/GoalsContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
-import { categoryById } from "../data/categories";
 import { colors, radius } from "../design";
 import { calculateHealth } from "../utils/coach";
 import { formatMoney } from "../utils/formatters";
@@ -351,7 +350,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 18, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 35 },
   scoreCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,

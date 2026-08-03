@@ -18,6 +18,7 @@ import { BudgetContext } from "../context/BudgetContext";
 import { SplitsContext } from "../context/SplitsContext";
 import { splitCategories } from "../data/splitCategories";
 import { colors, radius } from "../design";
+import { dateInputToIso, isValidDateInput } from "../utils/dates";
 
 const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
@@ -53,12 +54,7 @@ export default function ManageSplitScreen({ navigation, route }) {
   );
   const [note, setNote] = useState(existing?.note || "");
   const numericAmount = Number(amount.replace(",", "."));
-  const dateValid = useMemo(
-    () =>
-      /^\d{4}-\d{2}-\d{2}$/.test(dueDate) &&
-      !Number.isNaN(new Date(`${dueDate}T12:00:00`).getTime()),
-    [dueDate]
-  );
+  const dateValid = useMemo(() => isValidDateInput(dueDate), [dueDate]);
   const canSave =
     title.trim() && person.trim() && numericAmount > 0 && dateValid;
 
@@ -70,7 +66,7 @@ export default function ManageSplitScreen({ navigation, route }) {
       person: person.trim(),
       amount: numericAmount,
       category,
-      dueDate: new Date(`${dueDate}T12:00:00`).toISOString(),
+      dueDate: dateInputToIso(dueDate),
       note: note.trim(),
       status: existing?.status || "open",
     });
@@ -339,7 +335,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 19, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 760, alignSelf: "center", paddingHorizontal: 19, paddingBottom: 35 },
   segment: {
     flexDirection: "row",
     backgroundColor: colors.line,

@@ -21,6 +21,7 @@ import { categoryById } from "../data/categories";
 import { colors, radius, type } from "../design";
 import { categorySpend } from "../utils/calculations";
 import { formatMoney } from "../utils/formatters";
+import { isBillPaidForMonth } from "../utils/dates";
 
 export default function BudgetsScreen({ navigation }) {
   const {
@@ -98,6 +99,7 @@ export default function BudgetsScreen({ navigation }) {
                 .sort((a, b) => a.dueDay - b.dueDay)
                 .map((bill, index) => {
                   const category = categoryById(bill.category);
+                  const isPaid = isBillPaidForMonth(bill);
                   return (
                     <View key={bill.id}>
                       <Pressable onPress={() => toggleBill(bill.id)} style={styles.bill}>
@@ -105,16 +107,16 @@ export default function BudgetsScreen({ navigation }) {
                           <Ionicons name={category.icon} size={20} color={category.color} />
                         </View>
                         <View style={styles.billCopy}>
-                          <Text style={[styles.billTitle, bill.paid && styles.billPaid]}>{bill.title}</Text>
+                          <Text style={[styles.billTitle, isPaid && styles.billPaid]}>{bill.title}</Text>
                           <Text style={styles.billMeta}>Due day {bill.dueDay}</Text>
                         </View>
-                        <Text style={[styles.billAmount, bill.paid && styles.billPaid]}>
+                        <Text style={[styles.billAmount, isPaid && styles.billPaid]}>
                           {formatMoney(bill.amount, settings.currency)}
                         </Text>
                         <Ionicons
-                          name={bill.paid ? "checkmark-circle" : "ellipse-outline"}
+                          name={isPaid ? "checkmark-circle" : "ellipse-outline"}
                           size={23}
-                          color={bill.paid ? colors.primary : colors.soft}
+                          color={isPaid ? colors.primary : colors.soft}
                         />
                       </Pressable>
                       {index < bills.length - 1 ? <View style={styles.divider} /> : null}
@@ -162,7 +164,7 @@ export default function BudgetsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: 18, paddingBottom: 110 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 110 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 13, paddingBottom: 16 },
   eyebrow: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
   title: { ...type.h1, marginTop: 2, letterSpacing: -0.7 },

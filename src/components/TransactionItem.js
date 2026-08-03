@@ -24,7 +24,7 @@ export default function TransactionItem({ item, currency, onLongPress }) {
         </Text>
         <Text style={styles.meta}>
           {category.label} · {shortDate(item.date)}
-          {item.recurring ? " · Repeats" : ""}
+          {item.recurring ? " · Recurring" : ""}
         </Text>
       </View>
       <Text style={[styles.amount, income && styles.income]}>

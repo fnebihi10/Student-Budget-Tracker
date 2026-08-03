@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius } from "../design";
 
 export default function AppButton({
@@ -65,6 +65,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     gap: 9,
+    ...Platform.select({ web: { cursor: "pointer" } }),
   },
   secondary: {
     backgroundColor: colors.mint,
@@ -82,6 +83,7 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.45,
+    ...Platform.select({ web: { cursor: "not-allowed" } }),
   },
   pressed: {
     opacity: 0.8,

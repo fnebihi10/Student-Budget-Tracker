@@ -1,5 +1,6 @@
 import { categorySpend, getTotals } from "./calculations";
 import { activeSubscriptionTotal } from "./subscriptions";
+import { isBillPaidForMonth } from "./dates";
 
 export const calculateHealth = ({
   transactions,
@@ -16,7 +17,7 @@ export const calculateHealth = ({
   const recurringRatio = settings.monthlyBudget
     ? recurring / settings.monthlyBudget
     : 0;
-  const openBills = bills.filter((bill) => !bill.paid).length;
+  const openBills = bills.filter((bill) => !isBillPaidForMonth(bill)).length;
   const saved = goals.reduce((sum, goal) => sum + Number(goal.saved || 0), 0);
 
   const planScore =

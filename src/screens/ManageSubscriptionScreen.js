@@ -21,9 +21,10 @@ import {
   serviceById,
   subscriptionCategories,
 } from "../data/subscriptionCatalog";
-import { colors, radius, type } from "../design";
+import { colors, radius } from "../design";
 import { formatMoney } from "../utils/formatters";
 import { monthlyEquivalent } from "../utils/subscriptions";
+import { dateInputToIso, isValidDateInput } from "../utils/dates";
 
 const frequencies = ["weekly", "monthly", "yearly"];
 const reminders = [0, 1, 3, 7];
@@ -77,9 +78,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
 
   const numericAmount = Number(amount.replace(",", "."));
   const dateValid = useMemo(
-    () =>
-      /^\d{4}-\d{2}-\d{2}$/.test(nextBillingDate) &&
-      !Number.isNaN(new Date(`${nextBillingDate}T12:00:00`).getTime()),
+    () => isValidDateInput(nextBillingDate),
     [nextBillingDate]
   );
   const canSave = name.trim() && numericAmount > 0 && dateValid;
@@ -92,7 +91,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
       name: name.trim(),
       amount: numericAmount,
       frequency,
-      nextBillingDate: new Date(`${nextBillingDate}T12:00:00`).toISOString(),
+      nextBillingDate: dateInputToIso(nextBillingDate),
       category,
       reminderDays,
       notes: notes.trim(),
@@ -383,7 +382,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 19, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 760, alignSelf: "center", paddingHorizontal: 19, paddingBottom: 35 },
   serviceHero: {
     flexDirection: "row",
     alignItems: "center",

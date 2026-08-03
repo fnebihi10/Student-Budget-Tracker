@@ -21,6 +21,7 @@ import { goalTemplateById, goalTemplates } from "../data/goalTemplates";
 import { colors, radius } from "../design";
 import { formatMoney, shortDate } from "../utils/formatters";
 import { goalProgress, goalRemaining, monthlyGoalPace } from "../utils/goals";
+import { dateInputToIso, isValidDateInput } from "../utils/dates";
 
 const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
@@ -71,12 +72,7 @@ export default function ManageGoalScreen({ navigation, route }) {
   const template = goalTemplateById(templateId);
   const numericTarget = Number(target.replace(",", "."));
   const numericInitial = Number(initialSaved.replace(",", ".")) || 0;
-  const dateValid = useMemo(
-    () =>
-      /^\d{4}-\d{2}-\d{2}$/.test(deadline) &&
-      !Number.isNaN(new Date(`${deadline}T12:00:00`).getTime()),
-    [deadline]
-  );
+  const dateValid = useMemo(() => isValidDateInput(deadline), [deadline]);
   const canSave = name.trim() && numericTarget > 0 && dateValid;
 
   const chooseTemplate = (id) => {
@@ -97,7 +93,7 @@ export default function ManageGoalScreen({ navigation, route }) {
       name: name.trim(),
       target: numericTarget,
       ...(existing ? {} : { saved: Math.min(numericInitial, numericTarget) }),
-      deadline: new Date(`${deadline}T12:00:00`).toISOString(),
+      deadline: dateInputToIso(deadline),
       icon: template.icon,
       color: template.color,
       notes: notes.trim(),
@@ -523,7 +519,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 19, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 760, alignSelf: "center", paddingHorizontal: 19, paddingBottom: 35 },
   progressCard: {
     flexDirection: "row",
     alignItems: "center",

@@ -17,7 +17,8 @@ import AppButton from "../components/AppButton";
 import CategoryPicker from "../components/CategoryPicker";
 import { BudgetContext } from "../context/BudgetContext";
 import { expenseCategories, incomeCategories } from "../data/categories";
-import { colors, radius, type } from "../design";
+import { colors, radius } from "../design";
+import { dateInputToIso, isValidDateInput } from "../utils/dates";
 
 const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
@@ -38,7 +39,7 @@ export default function AddExpenseScreen({ navigation }) {
   const [category, setCategory] = useState("food");
   const [recurring, setRecurring] = useState(false);
   const categories = type === "expense" ? expenseCategories : incomeCategories;
-  const validDate = useMemo(() => /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(`${date}T12:00:00`).getTime()), [date]);
+  const validDate = useMemo(() => isValidDateInput(date), [date]);
   const canSave = Number(amount.replace(",", ".")) > 0 && title.trim() && validDate;
 
   const chooseType = (next) => {
@@ -52,7 +53,7 @@ export default function AddExpenseScreen({ navigation }) {
       amount: Number(amount.replace(",", ".")),
       title: title.trim(),
       note: note.trim(),
-      date: new Date(`${date}T12:00:00`).toISOString(),
+      date: dateInputToIso(date),
       category,
       recurring,
     });
@@ -158,8 +159,8 @@ export default function AddExpenseScreen({ navigation }) {
               <Ionicons name="repeat-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.repeatCopy}>
-              <Text style={styles.repeatTitle}>Recurring each month</Text>
-              <Text style={styles.repeatText}>Useful for rent, subscriptions, or regular income.</Text>
+              <Text style={styles.repeatTitle}>Mark as recurring</Text>
+              <Text style={styles.repeatText}>Labels regular entries so they are easy to identify later.</Text>
             </View>
             <Switch
               value={recurring}
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
   header: { height: 59, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   close: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   headerTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 19, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 19, paddingBottom: 35 },
   segment: { flexDirection: "row", backgroundColor: colors.line, borderRadius: radius.md, padding: 4, marginTop: 5 },
   segmentItem: { flex: 1, flexDirection: "row", gap: 7, alignItems: "center", justifyContent: "center", minHeight: 46, borderRadius: 14 },
   segmentActive: { backgroundColor: colors.primary },
