@@ -4,8 +4,18 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { AuthContext } from "./AuthContext";
+import {
+  deleteRow,
+  fetchRows,
+  newId,
+  subscriptionFromRow,
+  subscriptionToRow,
+  upsertRows,
+} from "../services/cloudData";
 
 const STORAGE_KEY = "@pocketwise/personal-subscriptions/v1";
 
@@ -60,26 +70,76 @@ const demoSubscriptions = [
 export const SubscriptionsContext = createContext(null);
 
 export function SubscriptionsProvider({ children }) {
+  const { user } = React.useContext(AuthContext);
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(true);
+  const [subscriptionsStorageError, setSubscriptionsStorageError] = useState("");
+  const [subscriptionsCloudReady, setSubscriptionsCloudReady] = useState(false);
+  const cloudUserRef = useRef(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
-        if (stored) setSubscriptions(JSON.parse(stored));
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (!Array.isArray(parsed)) throw new Error("Invalid subscriptions data");
+          setSubscriptions(parsed);
+        }
       })
-      .catch(() => {})
+      .catch(() =>
+        setSubscriptionsStorageError("Subscriptions could not be loaded.")
+      )
       .finally(() => setIsLoadingSubscriptions(false));
   }, []);
 
   useEffect(() => {
     if (isLoadingSubscriptions) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(subscriptions)).catch(
-      () => {}
+      () => setSubscriptionsStorageError("Subscriptions could not be saved.")
     );
   }, [subscriptions, isLoadingSubscriptions]);
 
+  useEffect(() => {
+    if (!user) {
+      if (cloudUserRef.current) setSubscriptions([]);
+      cloudUserRef.current = null;
+      setSubscriptionsCloudReady(false);
+      return;
+    }
+    if (isLoadingSubscriptions || cloudUserRef.current === user.id) return;
+    cloudUserRef.current = user.id;
+    setIsLoadingSubscriptions(true);
+    fetchRows("subscriptions", user.id, "next_billing_date")
+      .then((rows) => {
+        setSubscriptions(rows.map(subscriptionFromRow));
+        setSubscriptionsCloudReady(true);
+      })
+      .catch(() => {
+        setSubscriptionsCloudReady(false);
+        setSubscriptionsStorageError("Subscriptions could not be loaded from the cloud.");
+      })
+      .finally(() => setIsLoadingSubscriptions(false));
+  }, [user, isLoadingSubscriptions]);
+
+  useEffect(() => {
+    if (!user || !subscriptionsCloudReady || isLoadingSubscriptions) return;
+    const timer = setTimeout(() => {
+      upsertRows("subscriptions", user.id, subscriptions.map(subscriptionToRow)).catch(
+        () => setSubscriptionsStorageError("Subscriptions could not be synced.")
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [user, subscriptions, subscriptionsCloudReady, isLoadingSubscriptions]);
+
   const saveSubscription = useCallback((subscription) => {
+    const amount = Number(subscription.amount);
+    if (
+      !subscription.name?.trim() ||
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
+      return false;
+    }
     setSubscriptions((current) => {
       if (subscription.id) {
         return current.map((item) =>
@@ -89,13 +149,15 @@ export function SubscriptionsProvider({ children }) {
       return [
         {
           ...subscription,
-          id: `${Date.now()}-subscription`,
+          amount,
+          id: newId(),
           createdAt: new Date().toISOString(),
           status: "active",
         },
         ...current,
       ];
     });
+    return true;
   }, []);
 
   const toggleSubscription = useCallback((id) => {
@@ -113,7 +175,12 @@ export function SubscriptionsProvider({ children }) {
 
   const deleteSubscription = useCallback((id) => {
     setSubscriptions((current) => current.filter((item) => item.id !== id));
-  }, []);
+    if (user) {
+      deleteRow("subscriptions", user.id, id).catch(() =>
+        setSubscriptionsStorageError("The subscription could not be deleted from the cloud.")
+      );
+    }
+  }, [user]);
 
   const loadDemoSubscriptions = useCallback(
     () => setSubscriptions(demoSubscriptions),
@@ -126,6 +193,7 @@ export function SubscriptionsProvider({ children }) {
     () => ({
       subscriptions,
       isLoadingSubscriptions,
+      subscriptionsStorageError,
       saveSubscription,
       toggleSubscription,
       deleteSubscription,
@@ -135,6 +203,7 @@ export function SubscriptionsProvider({ children }) {
     [
       subscriptions,
       isLoadingSubscriptions,
+      subscriptionsStorageError,
       saveSubscription,
       toggleSubscription,
       deleteSubscription,

@@ -4,8 +4,18 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { AuthContext } from "./AuthContext";
+import {
+  deleteRow,
+  fetchRows,
+  goalFromRow,
+  goalToRow,
+  newId,
+  upsertRows,
+} from "../services/cloudData";
 
 const STORAGE_KEY = "@pocketwise/savings-goals/v1";
 
@@ -54,24 +64,69 @@ const demoGoals = [
 export const GoalsContext = createContext(null);
 
 export function GoalsProvider({ children }) {
+  const { user } = React.useContext(AuthContext);
   const [goals, setGoals] = useState([]);
   const [isLoadingGoals, setIsLoadingGoals] = useState(true);
+  const [goalsStorageError, setGoalsStorageError] = useState("");
+  const [goalsCloudReady, setGoalsCloudReady] = useState(false);
+  const cloudUserRef = useRef(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
-        if (stored) setGoals(JSON.parse(stored));
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (!Array.isArray(parsed)) throw new Error("Invalid goals data");
+          setGoals(parsed);
+        }
       })
-      .catch(() => {})
+      .catch(() => setGoalsStorageError("Savings goals could not be loaded."))
       .finally(() => setIsLoadingGoals(false));
   }, []);
 
   useEffect(() => {
     if (isLoadingGoals) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(goals)).catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(goals)).catch(() =>
+      setGoalsStorageError("Savings goals could not be saved.")
+    );
   }, [goals, isLoadingGoals]);
 
+  useEffect(() => {
+    if (!user) {
+      if (cloudUserRef.current) setGoals([]);
+      cloudUserRef.current = null;
+      setGoalsCloudReady(false);
+      return;
+    }
+    if (isLoadingGoals || cloudUserRef.current === user.id) return;
+    cloudUserRef.current = user.id;
+    setIsLoadingGoals(true);
+    fetchRows("goals", user.id, "created_at")
+      .then((rows) => {
+        setGoals(rows.map(goalFromRow));
+        setGoalsCloudReady(true);
+      })
+      .catch(() => {
+        setGoalsCloudReady(false);
+        setGoalsStorageError("Savings goals could not be loaded from the cloud.");
+      })
+      .finally(() => setIsLoadingGoals(false));
+  }, [user, isLoadingGoals]);
+
+  useEffect(() => {
+    if (!user || !goalsCloudReady || isLoadingGoals) return;
+    const timer = setTimeout(() => {
+      upsertRows("goals", user.id, goals.map(goalToRow)).catch(() =>
+        setGoalsStorageError("Savings goals could not be synced.")
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [user, goals, goalsCloudReady, isLoadingGoals]);
+
   const saveGoal = useCallback((goal) => {
+    const target = Number(goal.target);
+    const saved = Number(goal.saved) || 0;
+    if (!goal.name?.trim() || !Number.isFinite(target) || target <= 0) return false;
     setGoals((current) => {
       if (goal.id) {
         return current.map((item) =>
@@ -81,29 +136,31 @@ export function GoalsProvider({ children }) {
       return [
         {
           ...goal,
-          id: `${Date.now()}-goal`,
-          saved: Number(goal.saved) || 0,
+          id: newId(),
+          target,
+          saved: Math.max(0, saved),
           createdAt: new Date().toISOString(),
           activity: [],
         },
         ...current,
       ];
     });
+    return true;
   }, []);
 
   const addGoalActivity = useCallback((id, amount, note = "") => {
     const numeric = Number(amount);
-    if (!numeric) return;
+    if (!Number.isFinite(numeric) || numeric === 0) return false;
     setGoals((current) =>
       current.map((goal) => {
         if (goal.id !== id) return goal;
-        const nextSaved = Math.max(0, Number(goal.saved) + numeric);
+        const nextSaved = Math.max(0, (Number(goal.saved) || 0) + numeric);
         return {
           ...goal,
           saved: nextSaved,
           activity: [
             {
-              id: `${Date.now()}-goal-activity`,
+              id: newId(),
               amount: numeric,
               note: note.trim(),
               date: new Date().toISOString(),
@@ -113,11 +170,17 @@ export function GoalsProvider({ children }) {
         };
       })
     );
+    return true;
   }, []);
 
   const deleteGoal = useCallback((id) => {
     setGoals((current) => current.filter((goal) => goal.id !== id));
-  }, []);
+    if (user) {
+      deleteRow("goals", user.id, id).catch(() =>
+        setGoalsStorageError("The goal could not be deleted from the cloud.")
+      );
+    }
+  }, [user]);
 
   const loadDemoGoals = useCallback(() => setGoals(demoGoals), []);
   const resetGoals = useCallback(() => setGoals([]), []);
@@ -126,6 +189,7 @@ export function GoalsProvider({ children }) {
     () => ({
       goals,
       isLoadingGoals,
+      goalsStorageError,
       saveGoal,
       addGoalActivity,
       deleteGoal,
@@ -135,6 +199,7 @@ export function GoalsProvider({ children }) {
     [
       goals,
       isLoadingGoals,
+      goalsStorageError,
       saveGoal,
       addGoalActivity,
       deleteGoal,

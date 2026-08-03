@@ -4,8 +4,18 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { AuthContext } from "./AuthContext";
+import {
+  deleteRow,
+  fetchRows,
+  newId,
+  splitFromRow,
+  splitToRow,
+  upsertRows,
+} from "../services/cloudData";
 
 const STORAGE_KEY = "@pocketwise/shared-expenses/v1";
 
@@ -59,24 +69,75 @@ const demoSplits = [
 export const SplitsContext = createContext(null);
 
 export function SplitsProvider({ children }) {
+  const { user } = React.useContext(AuthContext);
   const [splits, setSplits] = useState([]);
   const [isLoadingSplits, setIsLoadingSplits] = useState(true);
+  const [splitsStorageError, setSplitsStorageError] = useState("");
+  const [splitsCloudReady, setSplitsCloudReady] = useState(false);
+  const cloudUserRef = useRef(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
-        if (stored) setSplits(JSON.parse(stored));
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (!Array.isArray(parsed)) throw new Error("Invalid shared expenses data");
+          setSplits(parsed);
+        }
       })
-      .catch(() => {})
+      .catch(() => setSplitsStorageError("Shared expenses could not be loaded."))
       .finally(() => setIsLoadingSplits(false));
   }, []);
 
   useEffect(() => {
     if (isLoadingSplits) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(splits)).catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(splits)).catch(() =>
+      setSplitsStorageError("Shared expenses could not be saved.")
+    );
   }, [splits, isLoadingSplits]);
 
+  useEffect(() => {
+    if (!user) {
+      if (cloudUserRef.current) setSplits([]);
+      cloudUserRef.current = null;
+      setSplitsCloudReady(false);
+      return;
+    }
+    if (isLoadingSplits || cloudUserRef.current === user.id) return;
+    cloudUserRef.current = user.id;
+    setIsLoadingSplits(true);
+    fetchRows("splits", user.id, "created_at")
+      .then((rows) => {
+        setSplits(rows.map(splitFromRow));
+        setSplitsCloudReady(true);
+      })
+      .catch(() => {
+        setSplitsCloudReady(false);
+        setSplitsStorageError("Shared expenses could not be loaded from the cloud.");
+      })
+      .finally(() => setIsLoadingSplits(false));
+  }, [user, isLoadingSplits]);
+
+  useEffect(() => {
+    if (!user || !splitsCloudReady || isLoadingSplits) return;
+    const timer = setTimeout(() => {
+      upsertRows("splits", user.id, splits.map(splitToRow)).catch(() =>
+        setSplitsStorageError("Shared expenses could not be synced.")
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [user, splits, splitsCloudReady, isLoadingSplits]);
+
   const saveSplit = useCallback((split) => {
+    const amount = Number(split.amount);
+    if (
+      !split.title?.trim() ||
+      !split.person?.trim() ||
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
+      return false;
+    }
     setSplits((current) => {
       if (split.id) {
         return current.map((item) =>
@@ -86,13 +147,15 @@ export function SplitsProvider({ children }) {
       return [
         {
           ...split,
-          id: `${Date.now()}-split`,
+          amount,
+          id: newId(),
           status: "open",
           createdAt: new Date().toISOString(),
         },
         ...current,
       ];
     });
+    return true;
   }, []);
 
   const settleSplit = useCallback((id) => {
@@ -112,7 +175,12 @@ export function SplitsProvider({ children }) {
 
   const deleteSplit = useCallback((id) => {
     setSplits((current) => current.filter((item) => item.id !== id));
-  }, []);
+    if (user) {
+      deleteRow("splits", user.id, id).catch(() =>
+        setSplitsStorageError("The shared expense could not be deleted from the cloud.")
+      );
+    }
+  }, [user]);
 
   const loadDemoSplits = useCallback(() => setSplits(demoSplits), []);
   const resetSplits = useCallback(() => setSplits([]), []);
@@ -121,6 +189,7 @@ export function SplitsProvider({ children }) {
     () => ({
       splits,
       isLoadingSplits,
+      splitsStorageError,
       saveSplit,
       settleSplit,
       deleteSplit,
@@ -130,6 +199,7 @@ export function SplitsProvider({ children }) {
     [
       splits,
       isLoadingSplits,
+      splitsStorageError,
       saveSplit,
       settleSplit,
       deleteSplit,

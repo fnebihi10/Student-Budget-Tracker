@@ -1,7 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useContext } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useContext, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppButton from "../components/AppButton";
 import { BudgetContext } from "../context/BudgetContext";
@@ -9,30 +19,71 @@ import { GoalsContext } from "../context/GoalsContext";
 import { SplitsContext } from "../context/SplitsContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
 import { colors, radius, type } from "../design";
+import { AuthContext } from "../context/AuthContext";
 
 const features = [
   ["sparkles-outline", "Know what is safe to spend"],
   ["pie-chart-outline", "Plan every student expense"],
-  ["shield-checkmark-outline", "Private and saved on your phone"],
+  ["shield-checkmark-outline", "Private account with secure cloud sync"],
 ];
 
 export default function LoginScreen({ navigation }) {
-  const { loadDemo, onboardingComplete, profile, signIn } = useContext(BudgetContext);
+  const { loadDemo } = useContext(BudgetContext);
+  const {
+    signIn,
+    startDemo,
+    authError,
+    resendConfirmation,
+    clearAuthError,
+  } = useContext(AuthContext);
   const { loadDemoGoals } = useContext(GoalsContext);
   const { loadDemoSubscriptions } = useContext(SubscriptionsContext);
   const { loadDemoSplits } = useContext(SplitsContext);
-  const returning = onboardingComplete && Boolean(profile.name);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const loadAllDemo = () => {
     loadDemo();
     loadDemoGoals();
     loadDemoSubscriptions();
     loadDemoSplits();
+    startDemo();
+  };
+
+  const submit = async () => {
+    clearAuthError();
+    setResendMessage("");
+    setLoading(true);
+    const { error } = await signIn(email, password);
+    setLoading(false);
+    if (error) Alert.alert("Could not sign in", error.message);
+  };
+
+  const resend = async () => {
+    if (!email.trim()) return;
+    setLoading(true);
+    setResendMessage("");
+    const { error } = await resendConfirmation(email);
+    setLoading(false);
+    if (!error) {
+      setResendMessage("A new confirmation email was sent. Use only the newest link.");
+    }
   };
 
   return (
     <LinearGradient colors={["#EFF8EF", "#F7F7F1", "#EEF5EA"]} style={styles.gradient}>
       <SafeAreaView style={styles.safe}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.flex}
+        >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.brand}>
           <View style={styles.logo}>
             <Ionicons name="leaf" size={20} color={colors.surface} />
@@ -40,7 +91,7 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.brandName}>Pocketwise</Text>
         </View>
 
-        <View style={styles.art}>
+        <View style={styles.artCompact}>
           <View style={styles.orbit}>
             <View style={styles.cardBack} />
             <View style={styles.card}>
@@ -66,9 +117,9 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         <View style={styles.copy}>
-          <Text style={styles.title}>{returning ? `Welcome back,\n${profile.name}.` : `Student money,\nmade lighter.`}</Text>
+          <Text style={styles.title}>Welcome back.</Text>
           <Text style={styles.subtitle}>
-            {returning ? "Everything is exactly where you left it on this device." : "A calm place to track spending, plan bills, and still enjoy university life."}
+            Sign in to securely sync your budget across your devices.
           </Text>
           <View style={styles.features}>
             {features.map(([icon, text]) => (
@@ -80,14 +131,63 @@ export default function LoginScreen({ navigation }) {
           </View>
         </View>
 
-        <AppButton
-          title={returning ? "Continue to my dashboard" : "Create my budget"}
-          icon="arrow-forward"
-          onPress={returning ? signIn : () => navigation.navigate("Setup")}
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email address"
+          placeholderTextColor={colors.soft}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          style={styles.input}
         />
-        <Pressable disabled={returning} onPress={loadAllDemo} style={styles.demo}>
-          <Text style={styles.demoText}>{returning ? "Your local data is still safely stored" : "Explore with demo data"}</Text>
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.soft}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="current-password"
+          style={styles.input}
+        />
+        <AppButton
+          title="Sign in"
+          icon="arrow-forward"
+          onPress={submit}
+          loading={loading}
+          disabled={!email.trim() || password.length < 8}
+        />
+        {authError ? (
+          <View accessibilityRole="alert" style={styles.authError}>
+            <Ionicons name="alert-circle-outline" size={18} color={colors.red} />
+            <Text style={styles.authErrorText}>{authError}</Text>
+          </View>
+        ) : null}
+        {authError?.toLowerCase().includes("confirm") ||
+        authError?.toLowerCase().includes("expired") ? (
+          <AppButton
+            title="Resend confirmation email"
+            variant="ghost"
+            onPress={resend}
+          />
+        ) : null}
+        {resendMessage ? (
+          <Text accessibilityRole="alert" style={styles.resendMessage}>
+            {resendMessage}
+          </Text>
+        ) : null}
+        <AppButton
+          title="Create an account"
+          variant="secondary"
+          onPress={() => navigation.navigate("Setup")}
+          style={styles.create}
+        />
+        <Pressable onPress={loadAllDemo} style={styles.demo}>
+          <Text style={styles.demoText}>Explore with demo data</Text>
         </Pressable>
+        </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -95,7 +195,15 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
+  flex: { flex: 1 },
   safe: { flex: 1, paddingHorizontal: 22, paddingBottom: 10 },
+  scroll: {
+    flexGrow: 1,
+    width: "100%",
+    maxWidth: 720,
+    alignSelf: "center",
+    paddingBottom: 8,
+  },
   brand: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 8 },
   logo: {
     height: 38,
@@ -107,6 +215,7 @@ const styles = StyleSheet.create({
   },
   brandName: { fontSize: 19, fontWeight: "900", color: colors.ink, letterSpacing: -0.5 },
   art: { flex: 1, minHeight: 230, alignItems: "center", justifyContent: "center" },
+  artCompact: { minHeight: 150, alignItems: "center", justifyContent: "center" },
   orbit: {
     width: 260,
     height: 210,
@@ -161,4 +270,33 @@ const styles = StyleSheet.create({
   featureText: { color: colors.ink, fontSize: 13, fontWeight: "600" },
   demo: { alignItems: "center", paddingVertical: 15 },
   demoText: { color: colors.primary, fontSize: 14, fontWeight: "800" },
+  input: {
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    color: colors.ink,
+    fontSize: 15,
+    marginBottom: 10,
+  },
+  create: { marginTop: 10 },
+  authError: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    borderRadius: 14,
+    backgroundColor: "#FFF1EF",
+    padding: 12,
+  },
+  authErrorText: { flex: 1, color: colors.red, fontSize: 12, fontWeight: "700" },
+  resendMessage: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    marginVertical: 8,
+  },
 });
