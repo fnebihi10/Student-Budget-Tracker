@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppButton from "../components/AppButton";
-import { colors, radius, type } from "../design";
+import { colors, radius } from "../design";
 
 const benefits = [
   ["analytics-outline", "Deeper spending forecasts"],
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   close: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   headerTitle: { color: colors.ink, fontSize: 15, fontWeight: "900" },
   restore: { color: colors.primary, fontSize: 12, fontWeight: "800" },
-  content: { paddingHorizontal: 18, paddingBottom: 30 },
+  content: { width: "100%", maxWidth: 760, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 30 },
   hero: { borderRadius: radius.xl, padding: 21, alignItems: "center" },
   sparkle: { width: 55, height: 55, borderRadius: 20, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center", marginBottom: 16 },
   heroEyebrow: { color: colors.lime, fontSize: 9, letterSpacing: 1.2, fontWeight: "900" },

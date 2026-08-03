@@ -3,6 +3,7 @@ import React, { useContext, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,11 +15,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppButton from "../components/AppButton";
 import { BudgetContext } from "../context/BudgetContext";
+import { AuthContext } from "../context/AuthContext";
 import { GoalsContext } from "../context/GoalsContext";
 import { SplitsContext } from "../context/SplitsContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
 import { colors, radius, shadow, type } from "../design";
 import { formatMoney } from "../utils/formatters";
+import { isBillPaidForMonth } from "../utils/dates";
 import { goalTotals } from "../utils/goals";
 import { activeSubscriptionTotal } from "../utils/subscriptions";
 
@@ -30,14 +33,15 @@ export default function ProfileScreen({ navigation }) {
     settings,
     updateSettings,
     updateProfile,
-    logout,
     transactions,
     bills,
   } = useContext(BudgetContext);
+  const { signOut, user, isDemo } = useContext(AuthContext);
   const { subscriptions } = useContext(SubscriptionsContext);
   const { goals } = useContext(GoalsContext);
   const { splits } = useContext(SplitsContext);
   const [showProfile, setShowProfile] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [name, setName] = useState(profile.name);
   const [school, setSchool] = useState(profile.school);
   const [budget, setBudget] = useState(String(settings.monthlyBudget));
@@ -56,15 +60,34 @@ export default function ProfileScreen({ navigation }) {
     setShowProfile(false);
   };
 
-  const confirmLogout = () =>
-    Alert.alert(
-      "Sign out of Pocketwise?",
-      "Your budgets, subscriptions, and goals will stay safely on this device. This local profile does not use a password or cloud account yet.",
-      [
-        { text: "Stay signed in", style: "cancel" },
-        { text: "Sign out", onPress: logout },
-      ]
-    );
+  const performLogout = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    const { error } = await signOut();
+    setIsSigningOut(false);
+    if (error && Platform.OS !== "web") {
+      Alert.alert("Could not sign out", error.message);
+    }
+  };
+
+  const confirmLogout = () => {
+    const message = isDemo
+      ? "This closes the local demo and returns to sign in."
+      : `Your cloud data stays securely linked to ${user?.email || "your account"}.`;
+
+    if (Platform.OS === "web") {
+      const confirmed = globalThis.confirm?.(
+        `Sign out of Pocketwise?\n\n${message}`
+      );
+      if (confirmed) void performLogout();
+      return;
+    }
+
+    Alert.alert("Sign out of Pocketwise?", message, [
+      { text: "Stay signed in", style: "cancel" },
+      { text: "Sign out", style: "destructive", onPress: performLogout },
+    ]);
+  };
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safe}>
@@ -101,11 +124,13 @@ export default function ProfileScreen({ navigation }) {
             </Text>
             <View style={styles.localPill}>
               <Ionicons
-                name="phone-portrait-outline"
+                name={isDemo ? "phone-portrait-outline" : "cloud-done-outline"}
                 size={11}
                 color={colors.primary}
               />
-              <Text style={styles.localText}>Private local profile</Text>
+              <Text style={styles.localText}>
+                {isDemo ? "Private local demo" : "Private cloud account"}
+              </Text>
             </View>
           </View>
         </View>
@@ -284,7 +309,7 @@ export default function ProfileScreen({ navigation }) {
           <SettingRow
             icon="calendar-outline"
             title="Upcoming commitments"
-            subtitle={`${bills.filter((bill) => !bill.paid).length} bills and ${
+            subtitle={`${bills.filter((bill) => !isBillPaidForMonth(bill)).length} bills and ${
               subscriptions.filter((item) => item.status === "active").length
             } subscriptions`}
             onPress={() => navigation.navigate("Budgets")}
@@ -298,14 +323,22 @@ export default function ProfileScreen({ navigation }) {
           />
         </View>
 
-        <Pressable onPress={confirmLogout} style={styles.logout}>
+        <Pressable
+          disabled={isSigningOut}
+          onPress={confirmLogout}
+          style={[styles.logout, isSigningOut && styles.logoutDisabled]}
+        >
           <View style={styles.logoutIcon}>
             <Ionicons name="log-out-outline" size={19} color={colors.primary} />
           </View>
           <View style={styles.logoutCopy}>
-            <Text style={styles.logoutTitle}>Sign out</Text>
+            <Text style={styles.logoutTitle}>
+              {isSigningOut ? "Signing out…" : "Sign out"}
+            </Text>
             <Text style={styles.logoutText}>
-              Keep all local data and return to the welcome screen
+              {isDemo
+                ? "Close the demo and return to the welcome screen"
+                : "Securely end this session; cloud data is retained"}
             </Text>
           </View>
           <Ionicons name="arrow-forward" size={19} color={colors.primary} />
@@ -433,7 +466,7 @@ function SettingRow({ icon, title, subtitle, onPress }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: 18, paddingBottom: 110 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 110 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -634,6 +667,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 17,
   },
+  logoutDisabled: { opacity: 0.65 },
   logoutIcon: {
     width: 41,
     height: 41,

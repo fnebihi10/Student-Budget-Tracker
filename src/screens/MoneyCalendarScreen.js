@@ -12,6 +12,7 @@ import { serviceById } from "../data/subscriptionCatalog";
 import { categoryById } from "../data/categories";
 import { colors, radius } from "../design";
 import { formatMoney } from "../utils/formatters";
+import { isBillPaidForMonth } from "../utils/dates";
 import { getNextRenewal } from "../utils/subscriptions";
 
 const typeConfig = {
@@ -83,7 +84,7 @@ export default function MoneyCalendarScreen({ navigation }) {
         type: "bill",
         date,
         title: bill.title,
-        subtitle: bill.paid ? "Marked paid" : "Monthly bill",
+        subtitle: isBillPaidForMonth(bill, date) ? "Marked paid" : "Monthly bill",
         amount: bill.amount,
         icon: category.icon,
         color: category.color,
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   todayText: { color: colors.primary, fontSize: 10, fontWeight: "900" },
-  content: { paddingHorizontal: 18, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 35 },
   calendar: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,

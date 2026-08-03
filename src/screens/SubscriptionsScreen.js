@@ -15,7 +15,7 @@ import SectionHeader from "../components/SectionHeader";
 import { BudgetContext } from "../context/BudgetContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
 import { serviceById, subscriptionCatalog } from "../data/subscriptionCatalog";
-import { colors, radius, shadow, type } from "../design";
+import { colors, radius, shadow } from "../design";
 import { formatMoney, shortDate } from "../utils/formatters";
 import {
   activeSubscriptionTotal,
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  content: { paddingHorizontal: 18, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 35 },
   hero: { borderRadius: radius.xl, padding: 20, ...shadow },
   heroTop: {
     flexDirection: "row",

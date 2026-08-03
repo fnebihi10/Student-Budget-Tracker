@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  content: { paddingHorizontal: 18, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 35 },
   hero: { borderRadius: radius.xl, padding: 20, ...shadow },
   heroTop: {
     flexDirection: "row",

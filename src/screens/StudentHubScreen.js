@@ -123,7 +123,7 @@ export default function StudentHubScreen({ navigation }) {
         <HubFeature
           icon="pulse"
           title="Smart money coach"
-          subtitle="Understand your score and get actions based on your real local data."
+          subtitle="Understand your score and get actions based on your financial data."
           badge={`${health.score}/100`}
           color="#4FA982"
           onPress={() => navigation.navigate("Coach")}
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 18, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 35 },
   hero: { borderRadius: radius.xl, padding: 20, ...shadow },
   heroTop: {
     flexDirection: "row",

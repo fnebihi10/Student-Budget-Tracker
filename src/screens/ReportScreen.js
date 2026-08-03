@@ -163,7 +163,7 @@ export default function ReportScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: 18, paddingBottom: 110 },
+  content: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 110 },
   header: { paddingTop: 13, paddingBottom: 16 },
   eyebrow: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
   title: { ...type.h1, marginTop: 2, letterSpacing: -0.7 },

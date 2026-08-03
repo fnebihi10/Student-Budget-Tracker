@@ -15,9 +15,11 @@ import { BudgetContext } from "../context/BudgetContext";
 import { GoalsContext } from "../context/GoalsContext";
 import { SplitsContext } from "../context/SplitsContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
+import { AuthContext } from "../context/AuthContext";
 import { colors, radius } from "../design";
 
 export default function PrivacyScreen({ navigation }) {
+  const { user, isDemo } = useContext(AuthContext);
   const budget = useContext(BudgetContext);
   const { subscriptions, resetSubscriptions } = useContext(SubscriptionsContext);
   const { goals, resetGoals } = useContext(GoalsContext);
@@ -96,13 +98,15 @@ export default function PrivacyScreen({ navigation }) {
           </View>
           <Text style={styles.heroTitle}>Your money story stays yours.</Text>
           <Text style={styles.heroText}>
-            Pocketwise currently stores your information locally on this
-            device. There is no cloud account, advertising profile, or analytics
-            service connected.
+            {isDemo
+              ? "Demo information stays on this device and is never uploaded."
+              : "Your account data is encrypted in transit and stored in Supabase with per-user database policies."}
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Stored on this device</Text>
+        <Text style={styles.sectionTitle}>
+          {isDemo ? "Stored on this device" : "Your synced records"}
+        </Text>
         <View style={styles.stats}>
           <DataStat
             icon="receipt-outline"
@@ -140,14 +144,22 @@ export default function PrivacyScreen({ navigation }) {
         <View style={styles.card}>
           <InfoRow
             icon="phone-portrait-outline"
-            title="Local-first storage"
-            text="Data is saved with device storage and remains available offline."
+            title={isDemo ? "Local demo storage" : "Private cloud storage"}
+            text={
+              isDemo
+                ? "Demo data is saved only on this device."
+                : `Signed in as ${user?.email || "your account"}; only this user can access its rows.`
+            }
           />
           <View style={styles.divider} />
           <InfoRow
             icon="cloud-offline-outline"
-            title="No cloud sync yet"
-            text="Deleting the app can also remove its data unless you export a copy first."
+            title={isDemo ? "No demo upload" : "Supabase synchronization"}
+            text={
+              isDemo
+                ? "Creating an account starts with a clean private workspace."
+                : "Changes sync to your authenticated Supabase account."
+            }
           />
           <View style={styles.divider} />
           <InfoRow
@@ -188,19 +200,36 @@ export default function PrivacyScreen({ navigation }) {
               <Ionicons name="trash-outline" size={21} color={colors.red} />
             </View>
             <View style={styles.dangerCopy}>
-              <Text style={styles.dangerTitle}>Erase all local data</Text>
+              <Text style={styles.dangerTitle}>
+                {isDemo ? "Erase all demo data" : "Delete account data"}
+              </Text>
               <Text style={styles.dangerText}>
-                Permanently return Pocketwise to a clean first launch.
+                {isDemo
+                  ? "Permanently return the local demo to a clean first launch."
+                  : "Cloud deletion is protected and requires explicit confirmation."}
               </Text>
             </View>
           </View>
-          <Pressable onPress={confirmErase} style={styles.eraseButton}>
-            <Text style={styles.eraseText}>Erase everything</Text>
+          <Pressable
+            onPress={
+              isDemo
+                ? confirmErase
+                : () =>
+                    Alert.alert(
+                      "Cloud deletion not enabled yet",
+                      "No data was removed. This control will be enabled after its production deletion workflow is approved."
+                    )
+            }
+            style={styles.eraseButton}
+          >
+            <Text style={styles.eraseText}>
+              {isDemo ? "Erase demo data" : "Delete cloud data"}
+            </Text>
           </Pressable>
         </View>
 
         <Text style={styles.footer}>
-          Pocketwise 1.0.0 · Local-first preview · No cloud account connected
+          Pocketwise 1.0.0 · {isDemo ? "Local demo" : "Supabase protected"}
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -251,7 +280,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 18, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 960, alignSelf: "center", paddingHorizontal: 18, paddingBottom: 35 },
   hero: {
     backgroundColor: colors.primaryDark,
     borderRadius: radius.xl,

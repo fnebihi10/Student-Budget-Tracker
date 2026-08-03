@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   header: { height: 60, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18 },
   back: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   title: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  content: { paddingHorizontal: 20, paddingBottom: 35 },
+  content: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 20, paddingBottom: 35 },
   art: { width: 58, height: 58, borderRadius: 20, backgroundColor: colors.mint, alignItems: "center", justifyContent: "center", marginTop: 18 },
   heading: { color: colors.ink, fontSize: 25, fontWeight: "900", letterSpacing: -0.8, marginTop: 17 },
   intro: { color: colors.muted, fontSize: 14, lineHeight: 21, marginTop: 7, marginBottom: 18 },
