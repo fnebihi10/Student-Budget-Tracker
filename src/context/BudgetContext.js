@@ -172,9 +172,14 @@ export const BudgetProvider = ({ children }) => {
 
   useEffect(() => {
     if (!user) {
-      if (cloudUserRef.current) setData(starterState);
+      const shouldClear = Boolean(cloudUserRef.current);
       cloudUserRef.current = null;
-      setCloudReady(false);
+      if (shouldClear) {
+        queueMicrotask(() => {
+          setData(starterState);
+          setCloudReady(false);
+        });
+      }
       return;
     }
     if (isAuthLoading) return;
@@ -240,7 +245,12 @@ export const BudgetProvider = ({ children }) => {
   ]);
 
   useEffect(() => {
-    if (!user || !cloudReady || isLoading) return;
+    if (
+      !user ||
+      cloudUserRef.current !== user.id ||
+      !cloudReady ||
+      isLoading
+    ) return;
     const timer = setTimeout(() => {
       syncBudgetData(user.id, data).catch(() =>
         setStorageError("Your latest changes could not be synced.")
@@ -292,6 +302,41 @@ export const BudgetProvider = ({ children }) => {
       }
     },
     [update, user]
+  );
+
+  const updateTransaction = useCallback(
+    (id, transaction) => {
+      const validType = transaction.type === "income" || transaction.type === "expense";
+      const transactionDate = new Date(transaction.date || Date.now());
+      const amount = positiveAmount(transaction.amount);
+      if (
+        !id ||
+        !validType ||
+        !transaction.title?.trim() ||
+        !amount ||
+        Number.isNaN(transactionDate.getTime())
+      ) {
+        return false;
+      }
+      update((current) => ({
+        ...current,
+        transactions: current.transactions.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                ...transaction,
+                id,
+                amount,
+                title: transaction.title.trim(),
+                note: transaction.note?.trim() || "",
+                date: transactionDate.toISOString(),
+              }
+            : item
+        ),
+      }));
+      return true;
+    },
+    [update]
   );
 
   const setCategoryBudget = useCallback(
@@ -413,6 +458,7 @@ export const BudgetProvider = ({ children }) => {
       isLoading,
       storageError,
       addTransaction,
+      updateTransaction,
       deleteTransaction,
       setCategoryBudget,
       saveBill,
@@ -430,6 +476,7 @@ export const BudgetProvider = ({ children }) => {
       isLoading,
       storageError,
       addTransaction,
+      updateTransaction,
       deleteTransaction,
       setCategoryBudget,
       saveBill,

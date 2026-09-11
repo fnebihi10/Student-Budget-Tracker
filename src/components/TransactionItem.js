@@ -5,13 +5,16 @@ import { categoryById } from "../data/categories";
 import { colors } from "../design";
 import { formatMoney, shortDate } from "../utils/formatters";
 
-export default function TransactionItem({ item, currency, onLongPress }) {
+export default function TransactionItem({ item, currency, onPress, onLongPress }) {
   const category = categoryById(item.category);
   const income = item.type === "income";
 
   return (
     <Pressable
       accessibilityLabel={`${item.title}, ${formatMoney(item.amount, currency)}`}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityHint={onPress ? "Opens this transaction for editing" : undefined}
+      onPress={onPress}
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useContext, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import EmptyState from "../components/EmptyState";
 import GoalShortcut from "../components/GoalShortcut";
@@ -17,6 +17,8 @@ import { formatMoney, monthLabel } from "../utils/formatters";
 import { isBillPaidForMonth } from "../utils/dates";
 
 export default function DashboardScreen({ navigation }) {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
   const { transactions, bills, profile, settings, toggleBill } = useContext(BudgetContext);
   const totals = useMemo(() => getTotals(transactions), [transactions]);
   const current = useMemo(
@@ -63,7 +65,11 @@ export default function DashboardScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.hero}>
+        <View style={[styles.overview, isWide && styles.overviewWide]}>
+        <LinearGradient
+          colors={[colors.primaryDark, colors.primary]}
+          style={[styles.hero, isWide && styles.heroWide]}
+        >
           <View style={styles.heroTop}>
             <View>
               <Text style={styles.heroLabel}>SAFE TO SPEND</Text>
@@ -97,7 +103,8 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </LinearGradient>
 
-        <View style={styles.quickRow}>
+        <View style={[styles.overviewSide, isWide && styles.overviewSideWide]}>
+        <View style={[styles.quickRow, isWide && styles.quickRowWide]}>
           <SummaryCard
             icon="arrow-down"
             label="Income"
@@ -140,6 +147,8 @@ export default function DashboardScreen({ navigation }) {
             <Ionicons name="checkmark-circle-outline" size={23} color={colors.soft} />
           </Pressable>
         ) : null}
+        </View>
+        </View>
 
         <StudentHubShortcut navigation={navigation} />
         <SubscriptionShortcut navigation={navigation} />
@@ -155,7 +164,13 @@ export default function DashboardScreen({ navigation }) {
             <View style={styles.list}>
               {current.slice(0, 4).map((item, index) => (
                 <View key={item.id}>
-                  <TransactionItem item={item} currency={settings.currency} />
+                  <TransactionItem
+                    item={item}
+                    currency={settings.currency}
+                    onPress={() =>
+                      navigation.navigate("AddTransaction", { transactionId: item.id })
+                    }
+                  />
                   {index < Math.min(current.length, 4) - 1 ? <View style={styles.divider} /> : null}
                 </View>
               ))}
@@ -233,6 +248,11 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: colors.primaryDark, fontWeight: "900", fontSize: 17 },
   hero: { borderRadius: radius.xl, padding: 20, overflow: "hidden", ...shadow },
+  overview: {},
+  overviewWide: { flexDirection: "row", alignItems: "stretch", gap: 12 },
+  heroWide: { flex: 1.25, justifyContent: "space-between" },
+  overviewSide: {},
+  overviewSideWide: { flex: 1 },
   heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   heroLabel: { color: "#A9C3B7", fontSize: 10, fontWeight: "900", letterSpacing: 1.3 },
   heroValue: { color: colors.surface, fontSize: 34, fontWeight: "900", letterSpacing: -1.3, marginTop: 3 },
@@ -263,6 +283,7 @@ const styles = StyleSheet.create({
   weeklyLabel: { color: colors.surface, fontSize: 12, fontWeight: "800" },
   weeklyText: { color: "#C5D6CE", fontSize: 10, marginTop: 3 },
   quickRow: { flexDirection: "row", gap: 9, marginTop: 12 },
+  quickRowWide: { marginTop: 0 },
   summaryCard: {
     flex: 1,
     backgroundColor: colors.surface,

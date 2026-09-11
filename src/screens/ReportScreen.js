@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useContext, useMemo } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import EmptyState from "../components/EmptyState";
+import MonthSwitcher from "../components/MonthSwitcher";
 import SectionHeader from "../components/SectionHeader";
 import SubscriptionImpactCard from "../components/SubscriptionImpactCard";
 import { BudgetContext } from "../context/BudgetContext";
@@ -15,13 +16,26 @@ const monthKey = (date) => `${date.getFullYear()}-${date.getMonth()}`;
 
 export default function ReportScreen({ navigation }) {
   const { transactions, settings } = useContext(BudgetContext);
-  const totals = useMemo(() => getTotals(transactions), [transactions]);
-  const spend = useMemo(() => categorySpend(transactions), [transactions]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const totals = useMemo(
+    () => getTotals(transactions, selectedMonth),
+    [transactions, selectedMonth]
+  );
+  const spend = useMemo(
+    () => categorySpend(transactions, selectedMonth),
+    [transactions, selectedMonth]
+  );
   const ranked = useMemo(
     () => Object.entries(spend).sort((a, b) => b[1] - a[1]),
     [spend]
   );
-  const daysElapsed = new Date().getDate();
+  const now = new Date();
+  const isCurrentMonth =
+    selectedMonth.getFullYear() === now.getFullYear() &&
+    selectedMonth.getMonth() === now.getMonth();
+  const daysElapsed = isCurrentMonth
+    ? now.getDate()
+    : new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
   const savingsRate = totals.income > 0 ? ((totals.income - totals.expenses) / totals.income) * 100 : 0;
   const maxCategory = ranked[0]?.[1] || 1;
 
@@ -50,6 +64,8 @@ export default function ReportScreen({ navigation }) {
           <Text style={styles.eyebrow}>MONEY, MADE CLEAR</Text>
           <Text style={styles.title}>Insights</Text>
         </View>
+
+        <MonthSwitcher value={selectedMonth} onChange={setSelectedMonth} />
 
         <View style={styles.scoreRow}>
           <View style={styles.scoreCard}>
@@ -134,8 +150,8 @@ export default function ReportScreen({ navigation }) {
           ) : (
             <EmptyState
               icon="pie-chart-outline"
-              title="Insights need a little data"
-              message="Add a few expenses and this page will show your spending patterns."
+              title="No spending in this month"
+              message="Choose another month or add expenses to reveal your spending patterns."
               action="Add expense"
               onAction={() => navigation.navigate("AddTransaction")}
             />
@@ -150,7 +166,7 @@ export default function ReportScreen({ navigation }) {
             <View style={styles.nudgeCopy}>
               <Text style={styles.nudgeTitle}>A useful nudge</Text>
               <Text style={styles.nudgeText}>
-                {categoryById(ranked[0][0]).label} is your largest category this month at{" "}
+                {categoryById(ranked[0][0]).label} was the largest category in this month at{" "}
                 {formatMoney(ranked[0][1], settings.currency)}. Review it before setting next month’s limit.
               </Text>
             </View>

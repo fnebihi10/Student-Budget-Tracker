@@ -19,6 +19,7 @@ import { BudgetContext } from "../context/BudgetContext";
 import { expenseCategories, incomeCategories } from "../data/categories";
 import { colors, radius } from "../design";
 import { dateInputToIso, isValidDateInput } from "../utils/dates";
+import { confirmAction } from "../utils/dialogs";
 
 const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
@@ -29,15 +30,19 @@ const formatInputDate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-export default function AddExpenseScreen({ navigation }) {
-  const { addTransaction, settings } = useContext(BudgetContext);
-  const [type, setType] = useState("expense");
-  const [amount, setAmount] = useState("");
-  const [title, setTitle] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState(formatInputDate(new Date()));
-  const [category, setCategory] = useState("food");
-  const [recurring, setRecurring] = useState(false);
+export default function AddExpenseScreen({ navigation, route }) {
+  const { addTransaction, updateTransaction, deleteTransaction, transactions, settings } =
+    useContext(BudgetContext);
+  const existing = transactions.find((item) => item.id === route.params?.transactionId);
+  const [type, setType] = useState(existing?.type || "expense");
+  const [amount, setAmount] = useState(existing ? String(existing.amount) : "");
+  const [title, setTitle] = useState(existing?.title || "");
+  const [note, setNote] = useState(existing?.note || "");
+  const [date, setDate] = useState(
+    existing ? formatInputDate(new Date(existing.date)) : formatInputDate(new Date())
+  );
+  const [category, setCategory] = useState(existing?.category || "food");
+  const [recurring, setRecurring] = useState(Boolean(existing?.recurring));
   const categories = type === "expense" ? expenseCategories : incomeCategories;
   const validDate = useMemo(() => isValidDateInput(date), [date]);
   const canSave = Number(amount.replace(",", ".")) > 0 && title.trim() && validDate;
@@ -48,7 +53,7 @@ export default function AddExpenseScreen({ navigation }) {
   };
 
   const save = () => {
-    addTransaction({
+    const transaction = {
       type,
       amount: Number(amount.replace(",", ".")),
       title: title.trim(),
@@ -56,10 +61,26 @@ export default function AddExpenseScreen({ navigation }) {
       date: dateInputToIso(date),
       category,
       recurring,
-    });
+    };
+    const saved = existing
+      ? updateTransaction(existing.id, transaction)
+      : addTransaction(transaction);
+    if (!saved) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     navigation.goBack();
   };
+
+  const remove = () =>
+    confirmAction({
+      title: "Delete transaction?",
+      message: "This transaction will be permanently removed.",
+      cancelLabel: "Keep it",
+      confirmLabel: "Delete",
+      onConfirm: () => {
+        deleteTransaction(existing.id);
+        navigation.goBack();
+      },
+    });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -68,7 +89,7 @@ export default function AddExpenseScreen({ navigation }) {
           <Pressable onPress={() => navigation.goBack()} style={styles.close}>
             <Ionicons name="close" size={23} color={colors.ink} />
           </Pressable>
-          <Text style={styles.headerTitle}>New transaction</Text>
+          <Text style={styles.headerTitle}>{existing ? "Edit transaction" : "New transaction"}</Text>
           <View style={styles.close} />
         </View>
 
@@ -171,12 +192,21 @@ export default function AddExpenseScreen({ navigation }) {
           </View>
 
           <AppButton
-            title={`Save ${type}`}
+            title={existing ? "Save changes" : `Save ${type}`}
             icon="checkmark"
             onPress={save}
             disabled={!canSave}
             style={styles.save}
           />
+          {existing ? (
+            <AppButton
+              title="Delete transaction"
+              icon="trash-outline"
+              variant="ghost"
+              onPress={remove}
+              style={styles.deleteButton}
+            />
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -213,4 +243,5 @@ const styles = StyleSheet.create({
   repeatTitle: { color: colors.ink, fontSize: 13, fontWeight: "800" },
   repeatText: { color: colors.muted, fontSize: 10, lineHeight: 14, marginTop: 3 },
   save: { marginTop: 22, minHeight: 58 },
+  deleteButton: { marginTop: 8 },
 });
