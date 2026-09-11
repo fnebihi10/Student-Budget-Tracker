@@ -93,9 +93,14 @@ export function GoalsProvider({ children }) {
 
   useEffect(() => {
     if (!user) {
-      if (cloudUserRef.current) setGoals([]);
+      const shouldClear = Boolean(cloudUserRef.current);
       cloudUserRef.current = null;
-      setGoalsCloudReady(false);
+      if (shouldClear) {
+        queueMicrotask(() => {
+          setGoals([]);
+          setGoalsCloudReady(false);
+        });
+      }
       return;
     }
     if (isLoadingGoals || cloudUserRef.current === user.id) return;
@@ -114,7 +119,12 @@ export function GoalsProvider({ children }) {
   }, [user, isLoadingGoals]);
 
   useEffect(() => {
-    if (!user || !goalsCloudReady || isLoadingGoals) return;
+    if (
+      !user ||
+      cloudUserRef.current !== user.id ||
+      !goalsCloudReady ||
+      isLoadingGoals
+    ) return;
     const timer = setTimeout(() => {
       upsertRows("goals", user.id, goals.map(goalToRow)).catch(() =>
         setGoalsStorageError("Savings goals could not be synced.")

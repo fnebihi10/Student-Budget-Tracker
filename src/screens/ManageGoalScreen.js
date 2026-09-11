@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useContext, useMemo, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { confirmAction } from "../utils/dialogs";
 import AppButton from "../components/AppButton";
 import { BudgetContext } from "../context/BudgetContext";
 import { GoalsContext } from "../context/GoalsContext";
@@ -119,21 +119,16 @@ export default function ManageGoalScreen({ navigation, route }) {
   };
 
   const confirmDelete = () =>
-    Alert.alert(
-      `Delete ${existing.name}?`,
-      "The goal and its contribution history will be permanently removed.",
-      [
-        { text: "Keep it", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteGoal(existing.id);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    confirmAction({
+      title: `Delete ${existing.name}?`,
+      message: "The goal and its contribution history will be permanently removed.",
+      cancelLabel: "Keep it",
+      confirmLabel: "Delete",
+      onConfirm: () => {
+        deleteGoal(existing.id);
+        navigation.goBack();
+      },
+    });
 
   return (
     <SafeAreaView style={styles.safe}>
