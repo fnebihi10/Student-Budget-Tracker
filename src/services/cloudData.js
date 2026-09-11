@@ -37,6 +37,11 @@ export async function deleteRow(table, userId, id) {
   );
 }
 
+export async function deleteOwnAccount() {
+  ensure(await supabase.rpc("delete_own_account"));
+  await supabase.auth.signOut({ scope: "local" });
+}
+
 export async function fetchBudgetData(user) {
   const [profileResult, settingsResult, transactions, bills] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),

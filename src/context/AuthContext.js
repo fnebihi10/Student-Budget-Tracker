@@ -8,15 +8,22 @@ import React, {
 import { supabase } from "../lib/supabase";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { deleteOwnAccount } from "../services/cloudData";
 
 const PENDING_ONBOARDING_KEY = "@pocketwise/pending-onboarding/v1";
+
+const initialAuthError = () => {
+  if (Platform.OS !== "web" || !globalThis.location?.hash) return "";
+  const params = new URLSearchParams(globalThis.location.hash.slice(1));
+  return (params.get("error_description") || "").replace(/\+/g, " ");
+};
 
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState("");
+  const [authError, setAuthError] = useState(initialAuthError);
   const [isDemo, setIsDemo] = useState(false);
   const [pendingOnboarding, setPendingOnboarding] = useState(null);
   const [isPendingLoading, setIsPendingLoading] = useState(true);
@@ -25,9 +32,7 @@ export function AuthProvider({ children }) {
     let mounted = true;
     if (Platform.OS === "web" && globalThis.location?.hash) {
       const params = new URLSearchParams(globalThis.location.hash.slice(1));
-      const description = params.get("error_description");
-      if (description) {
-        setAuthError(description.replace(/\+/g, " "));
+      if (params.get("error_description")) {
         globalThis.history?.replaceState(
           {},
           globalThis.document?.title || "",
@@ -151,6 +156,16 @@ export function AuthProvider({ children }) {
     setIsDemo(true);
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    setAuthError("");
+    const { error } = await Promise.resolve()
+      .then(() => deleteOwnAccount())
+      .then(() => ({ error: null }))
+      .catch((error) => ({ error }));
+    if (error) setAuthError(error.message || "Your account could not be deleted.");
+    return { error };
+  }, []);
+
   const value = useMemo(
     () => ({
       session,
@@ -162,6 +177,7 @@ export function AuthProvider({ children }) {
       signUp,
       signOut,
       startDemo,
+      deleteAccount,
       resendConfirmation,
       clearAuthError,
       pendingOnboarding,
@@ -177,6 +193,7 @@ export function AuthProvider({ children }) {
       signUp,
       signOut,
       startDemo,
+      deleteAccount,
       resendConfirmation,
       clearAuthError,
       pendingOnboarding,

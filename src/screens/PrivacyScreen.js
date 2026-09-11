@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useContext, useState } from "react";
 import {
-  Alert,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -17,14 +17,16 @@ import { SplitsContext } from "../context/SplitsContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
 import { AuthContext } from "../context/AuthContext";
 import { colors, radius } from "../design";
+import { confirmAction, showMessage } from "../utils/dialogs";
 
 export default function PrivacyScreen({ navigation }) {
-  const { user, isDemo } = useContext(AuthContext);
+  const { user, isDemo, deleteAccount } = useContext(AuthContext);
   const budget = useContext(BudgetContext);
   const { subscriptions, resetSubscriptions } = useContext(SubscriptionsContext);
   const { goals, resetGoals } = useContext(GoalsContext);
   const { splits, resetSplits } = useContext(SplitsContext);
   const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const exportData = async () => {
     setExporting(true);
@@ -41,12 +43,25 @@ export default function PrivacyScreen({ navigation }) {
         goals,
         splits,
       };
-      await Share.share({
-        title: "Pocketwise data export",
-        message: JSON.stringify(payload, null, 2),
-      });
+      const contents = JSON.stringify(payload, null, 2);
+      if (Platform.OS === "web" && globalThis.document) {
+        const blob = new Blob([contents], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const anchor = globalThis.document.createElement("a");
+        anchor.href = url;
+        anchor.download = `pocketwise-export-${new Date().toISOString().slice(0, 10)}.json`;
+        globalThis.document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        await Share.share({
+          title: "Pocketwise data export",
+          message: contents,
+        });
+      }
     } catch {
-      Alert.alert(
+      showMessage(
         "Export unavailable",
         "Your device could not open the share sheet. No data was changed."
       );
@@ -56,23 +71,41 @@ export default function PrivacyScreen({ navigation }) {
   };
 
   const confirmErase = () =>
-    Alert.alert(
-      "Permanently erase everything?",
-      "This removes your profile, transactions, budgets, bills, subscriptions, savings goals, and shared expenses from this device. It cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Erase everything",
-          style: "destructive",
-          onPress: () => {
-            resetSubscriptions();
-            resetGoals();
-            resetSplits();
-            budget.resetData();
-          },
-        },
-      ]
-    );
+    confirmAction({
+      title: "Permanently erase everything?",
+      message:
+        "This removes your profile, transactions, budgets, bills, subscriptions, savings goals, and shared expenses from this device. It cannot be undone.",
+      confirmLabel: "Erase everything",
+      onConfirm: () => {
+        resetSubscriptions();
+        resetGoals();
+        resetSplits();
+        budget.resetData();
+      },
+    });
+
+  const performAccountDeletion = async () => {
+    setDeleting(true);
+    const { error } = await deleteAccount();
+    setDeleting(false);
+    if (error) {
+      showMessage(
+        "Account not deleted",
+        "We could not complete the deletion. Check your connection and try again."
+      );
+    }
+  };
+
+  const confirmAccountDeletion = () => {
+    const message =
+      "Your account and every synced transaction, bill, subscription, goal, and shared expense will be permanently deleted. This cannot be undone.";
+    confirmAction({
+      title: "Delete your Pocketwise account?",
+      message,
+      confirmLabel: "Delete account",
+      onConfirm: () => void performAccountDeletion(),
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -100,7 +133,7 @@ export default function PrivacyScreen({ navigation }) {
           <Text style={styles.heroText}>
             {isDemo
               ? "Demo information stays on this device and is never uploaded."
-              : "Your account data is encrypted in transit and stored in Supabase with per-user database policies."}
+              : "Your data syncs over encrypted connections to Supabase with per-user database policies, with a local device cache for offline access."}
           </Text>
         </View>
 
@@ -144,11 +177,11 @@ export default function PrivacyScreen({ navigation }) {
         <View style={styles.card}>
           <InfoRow
             icon="phone-portrait-outline"
-            title={isDemo ? "Local demo storage" : "Private cloud storage"}
+            title={isDemo ? "Local demo storage" : "Device cache and private cloud"}
             text={
               isDemo
                 ? "Demo data is saved only on this device."
-                : `Signed in as ${user?.email || "your account"}; only this user can access its rows.`
+                : `Signed in as ${user?.email || "your account"}; app records are cached on this device and protected per user in the cloud.`
             }
           />
           <View style={styles.divider} />
@@ -206,24 +239,17 @@ export default function PrivacyScreen({ navigation }) {
               <Text style={styles.dangerText}>
                 {isDemo
                   ? "Permanently return the local demo to a clean first launch."
-                  : "Cloud deletion is protected and requires explicit confirmation."}
+                  : "Permanently remove your account and all synced records."}
               </Text>
             </View>
           </View>
           <Pressable
-            onPress={
-              isDemo
-                ? confirmErase
-                : () =>
-                    Alert.alert(
-                      "Cloud deletion not enabled yet",
-                      "No data was removed. This control will be enabled after its production deletion workflow is approved."
-                    )
-            }
-            style={styles.eraseButton}
+            disabled={deleting}
+            onPress={isDemo ? confirmErase : confirmAccountDeletion}
+            style={[styles.eraseButton, deleting && styles.eraseButtonDisabled]}
           >
             <Text style={styles.eraseText}>
-              {isDemo ? "Erase demo data" : "Delete cloud data"}
+              {deleting ? "Deleting…" : isDemo ? "Erase demo data" : "Delete my account"}
             </Text>
           </Pressable>
         </View>
@@ -428,6 +454,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 13,
   },
+  eraseButtonDisabled: { opacity: 0.5 },
   eraseText: { color: colors.red, fontSize: 12, fontWeight: "900" },
   footer: {
     color: colors.soft,
