@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useContext, useMemo } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { confirmAction } from "../utils/dialogs";
 import EmptyState from "../components/EmptyState";
 import SectionHeader from "../components/SectionHeader";
 import { BudgetContext } from "../context/BudgetContext";
@@ -30,18 +31,13 @@ export default function SplitsScreen({ navigation }) {
   const net = totals.owed_to_me - totals.i_owe;
 
   const confirmDelete = (item) =>
-    Alert.alert(
-      `Remove ${item.title}?`,
-      "This shared-expense record will be permanently removed.",
-      [
-        { text: "Keep it", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => deleteSplit(item.id),
-        },
-      ]
-    );
+    confirmAction({
+      title: `Remove ${item.title}?`,
+      message: "This shared-expense record will be permanently removed.",
+      cancelLabel: "Keep it",
+      confirmLabel: "Remove",
+      onConfirm: () => deleteSplit(item.id),
+    });
 
   return (
     <SafeAreaView style={styles.safe}>

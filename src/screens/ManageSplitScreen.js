@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useContext, useMemo, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { confirmAction } from "../utils/dialogs";
 import AppButton from "../components/AppButton";
 import { BudgetContext } from "../context/BudgetContext";
 import { SplitsContext } from "../context/SplitsContext";
@@ -77,21 +77,16 @@ export default function ManageSplitScreen({ navigation, route }) {
   };
 
   const confirmDelete = () =>
-    Alert.alert(
-      `Remove ${existing.title}?`,
-      "This shared-expense record will be permanently removed.",
-      [
-        { text: "Keep it", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            deleteSplit(existing.id);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    confirmAction({
+      title: `Remove ${existing.title}?`,
+      message: "This shared-expense record will be permanently removed.",
+      cancelLabel: "Keep it",
+      confirmLabel: "Remove",
+      onConfirm: () => {
+        deleteSplit(existing.id);
+        navigation.goBack();
+      },
+    });
 
   return (
     <SafeAreaView style={styles.safe}>

@@ -98,9 +98,14 @@ export function SplitsProvider({ children }) {
 
   useEffect(() => {
     if (!user) {
-      if (cloudUserRef.current) setSplits([]);
+      const shouldClear = Boolean(cloudUserRef.current);
       cloudUserRef.current = null;
-      setSplitsCloudReady(false);
+      if (shouldClear) {
+        queueMicrotask(() => {
+          setSplits([]);
+          setSplitsCloudReady(false);
+        });
+      }
       return;
     }
     if (isLoadingSplits || cloudUserRef.current === user.id) return;
@@ -119,7 +124,12 @@ export function SplitsProvider({ children }) {
   }, [user, isLoadingSplits]);
 
   useEffect(() => {
-    if (!user || !splitsCloudReady || isLoadingSplits) return;
+    if (
+      !user ||
+      cloudUserRef.current !== user.id ||
+      !splitsCloudReady ||
+      isLoadingSplits
+    ) return;
     const timer = setTimeout(() => {
       upsertRows("splits", user.id, splits.map(splitToRow)).catch(() =>
         setSplitsStorageError("Shared expenses could not be synced.")
