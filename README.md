@@ -1,64 +1,111 @@
 # Pocketwise
 
-Pocketwise is a student budgeting app built with Expo, React Native, and Supabase.
+Pocketwise is a cross-platform personal finance app designed for students. It
+combines day-to-day expense tracking with budgets, recurring costs, savings
+goals, shared expenses, and practical cash-flow guidance in one responsive
+Expo application.
 
-## What works
+The project runs on iOS, Android, and the web from a shared React Native
+codebase. Authenticated data is synchronized with Supabase, while local storage
+keeps sessions and demo data available on the device.
 
-- Guided first-run setup and a ready-made demo mode
-- Persistent on-device transactions, income, and notes
-- Category budgets with live progress and over-budget states
-- Monthly bills with paid/unpaid tracking
-- Personal subscription tracker with popular services, custom memberships, renewal calendar, pause/resume, free trials, reminders, and monthly/yearly cost insights
-- Savings goals with templates, deadlines, recommended pace, deposits, withdrawals, progress, and contribution history
-- Student Money Hub with a unified money calendar, transparent financial-health coach, and shared-expense settlement tracking
-- Expanded profile hub with financial snapshots, authenticated sign-out, JSON data export, and a dedicated privacy center
-- Searchable and filterable transaction history
-- Monthly cash-flow dashboard and safe-to-spend guidance
-- Four-month reporting, category breakdowns, and useful nudges
-- Currency, reminder, profile, and monthly-plan settings
-- Professional Pro paywall preview with honest billing disclosure
+## Highlights
 
-## Run on an iPhone with Expo Go
+- Expense and income tracking with editing, notes, categories, and monthly history
+- Category budgets with live progress and over-budget indicators
+- Recurring bills and subscriptions with renewals, trials, and annual cost insights
+- Savings goals with templates, deadlines, recommended pace, and contribution history
+- Shared-expense tracking and settlement status
+- Money calendar, reports, financial-health guidance, and safe-to-spend estimates
+- Responsive layouts for mobile and desktop web
+- Guided onboarding, authenticated accounts, demo mode, JSON export, and account deletion
 
-1. Install **Expo Go** from the iOS App Store.
-2. Make sure the laptop and iPhone are on the same Wi-Fi network.
-3. In this project folder, run:
+## Technical overview
 
-   ```powershell
-   npm install
-   npx expo start
-   ```
+| Area | Implementation |
+| --- | --- |
+| Client | Expo SDK 57, React 19, React Native 0.86 |
+| Navigation | React Navigation 7 |
+| Backend | Supabase Auth and PostgreSQL |
+| Security | Row Level Security, per-user policies, restricted account-deletion RPC |
+| Persistence | Supabase cloud sync and AsyncStorage local cache/demo data |
+| Quality | ESLint, Jest, Expo Doctor, and production exports for web, iOS, and Android |
 
-4. Scan the QR code with the iPhone Camera app, then open it in Expo Go.
-5. If local network discovery is blocked, run `npx expo start --tunnel` instead.
+The application is organized by responsibility: reusable UI components live in
+`src/components`, feature screens in `src/screens`, state and synchronization in
+`src/context`, pure calculations in `src/utils`, and Supabase access in
+`src/services` and `src/lib`.
 
-## Environment
+## Local setup
 
-Copy .env.example to .env.local and provide the Supabase project URL and
-publishable key. Never expose a secret or service_role key.
-
-## Data and privacy
-
-Authenticated account data is stored in Supabase and protected by per-user Row
-Level Security policies. AsyncStorage is used for session persistence and local
-demo/cache behavior. No analytics or advertising service is connected.
-
-## Subscription status
-
-The paywall UI is implemented, but purchases are intentionally disabled. A production subscription requires:
-
-1. Apple App Store Connect subscription products and agreements.
-2. A RevenueCat project (or a custom StoreKit 2 backend).
-3. Product identifiers, entitlement mapping, API keys, restore handling, and webhook verification.
-4. A development build; real in-app purchases do not run inside standard Expo Go.
-5. Final pricing, privacy policy, terms, renewal language, and App Store review.
-
-Never present a successful purchase until the store receipt and entitlement have been verified.
-
-## Useful commands
+Node.js 22.13 or newer is required. The included `.nvmrc` targets Node 22.21.0.
 
 ```powershell
+npm install
+Copy-Item .env.example .env.local
 npm start
-npm run web
-npx expo export --platform web
 ```
+
+Set these public client values in `.env.local` before using authenticated cloud
+features:
+
+```dotenv
+EXPO_PUBLIC_SUPABASE_URL=your-project-url
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+Never place a database password or Supabase `service_role` key in the client or
+repository.
+
+### Run on a device
+
+Install Expo Go, sign in to the same Expo account used by the CLI, and scan the
+QR code shown by `npm start`. The phone and computer should normally be on the
+same Wi-Fi network. If local discovery is blocked, use:
+
+```powershell
+npm run start:tunnel
+```
+
+## Database setup
+
+The SQL files in `supabase/migrations` are the versioned production schema, not
+sample data. They create the tables, constraints, indexes, signup trigger, Data
+API grants, Row Level Security policies, and the self-service account-deletion
+function used by the app.
+
+Apply migrations in filename order through the Supabase CLI or SQL Editor. A
+database that already has the initial schema only needs migrations that have not
+previously been applied. More detail is available in
+[`supabase/README.md`](supabase/README.md).
+
+## Quality checks
+
+```powershell
+npm run lint
+npm test
+npx expo-doctor
+npm run export
+```
+
+Run the complete local verification pipeline with:
+
+```powershell
+npm run check
+```
+
+The utility test suite covers date handling, calculations, coaching logic, and
+subscription projections. Production export validates all three supported
+targets: web, iOS, and Android.
+
+## Privacy and current scope
+
+Authenticated records are isolated by user ID through PostgreSQL Row Level
+Security. Users can export their data and permanently delete their account.
+There are no analytics or advertising integrations.
+
+The Pro paywall is an interface preview only; purchases are intentionally
+disabled until store products, receipt validation, entitlement handling,
+restore purchases, legal documents, and production email delivery are
+configured. The UI never reports a successful purchase without store-backed
+verification.
