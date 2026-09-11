@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { showMessage } from "../utils/dialogs";
 import AppButton from "../components/AppButton";
 import { colors, radius } from "../design";
 
@@ -17,7 +18,7 @@ export default function SubscriptionScreen({ navigation }) {
   const [plan, setPlan] = useState("annual");
 
   const unavailable = () =>
-    Alert.alert(
+    showMessage(
       "Billing setup needed",
       "The paywall is ready, but real purchases must be connected to App Store products and RevenueCat before release. No payment was taken."
     );

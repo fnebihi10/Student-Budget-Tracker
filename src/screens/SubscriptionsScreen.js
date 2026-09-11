@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useContext, useMemo } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { confirmAction } from "../utils/dialogs";
 import EmptyState from "../components/EmptyState";
 import SectionHeader from "../components/SectionHeader";
 import { BudgetContext } from "../context/BudgetContext";
@@ -51,18 +51,13 @@ export default function SubscriptionsScreen({ navigation }) {
   );
 
   const confirmDelete = (item) =>
-    Alert.alert(
-      `Remove ${item.name}?`,
-      "This removes it from Pocketwise only. It does not cancel the service with its provider.",
-      [
-        { text: "Keep it", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => deleteSubscription(item.id),
-        },
-      ]
-    );
+    confirmAction({
+      title: `Remove ${item.name}?`,
+      message: "This removes it from Pocketwise only. It does not cancel the service with its provider.",
+      cancelLabel: "Keep it",
+      confirmLabel: "Remove",
+      onConfirm: () => deleteSubscription(item.id),
+    });
 
   return (
     <SafeAreaView style={styles.safe}>

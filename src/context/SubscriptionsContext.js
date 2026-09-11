@@ -101,9 +101,14 @@ export function SubscriptionsProvider({ children }) {
 
   useEffect(() => {
     if (!user) {
-      if (cloudUserRef.current) setSubscriptions([]);
+      const shouldClear = Boolean(cloudUserRef.current);
       cloudUserRef.current = null;
-      setSubscriptionsCloudReady(false);
+      if (shouldClear) {
+        queueMicrotask(() => {
+          setSubscriptions([]);
+          setSubscriptionsCloudReady(false);
+        });
+      }
       return;
     }
     if (isLoadingSubscriptions || cloudUserRef.current === user.id) return;
@@ -122,7 +127,12 @@ export function SubscriptionsProvider({ children }) {
   }, [user, isLoadingSubscriptions]);
 
   useEffect(() => {
-    if (!user || !subscriptionsCloudReady || isLoadingSubscriptions) return;
+    if (
+      !user ||
+      cloudUserRef.current !== user.id ||
+      !subscriptionsCloudReady ||
+      isLoadingSubscriptions
+    ) return;
     const timer = setTimeout(() => {
       upsertRows("subscriptions", user.id, subscriptions.map(subscriptionToRow)).catch(
         () => setSubscriptionsStorageError("Subscriptions could not be synced.")

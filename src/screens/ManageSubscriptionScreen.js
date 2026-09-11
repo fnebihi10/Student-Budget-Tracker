@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useContext, useMemo, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { confirmAction } from "../utils/dialogs";
 import AppButton from "../components/AppButton";
 import { BudgetContext } from "../context/BudgetContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
@@ -107,21 +107,16 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
   };
 
   const confirmDelete = () =>
-    Alert.alert(
-      `Remove ${existing.name}?`,
-      "This only removes the tracker entry. It will not cancel your provider subscription.",
-      [
-        { text: "Keep it", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            deleteSubscription(existing.id);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    confirmAction({
+      title: `Remove ${existing.name}?`,
+      message: "This only removes the tracker entry. It will not cancel your provider subscription.",
+      cancelLabel: "Keep it",
+      confirmLabel: "Remove",
+      onConfirm: () => {
+        deleteSubscription(existing.id);
+        navigation.goBack();
+      },
+    });
 
   return (
     <SafeAreaView style={styles.safe}>
