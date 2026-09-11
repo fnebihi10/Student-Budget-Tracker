@@ -1,4 +1,5 @@
 import { colors } from "./theme";
+import { Platform } from "react-native";
 
 export { colors };
 
@@ -9,13 +10,18 @@ export const radius = {
   xl: 30,
 };
 
-export const shadow = {
-  shadowColor: "#163326",
-  shadowOpacity: 0.08,
-  shadowRadius: 16,
-  shadowOffset: { width: 0, height: 8 },
-  elevation: 3,
-};
+export const shadow = Platform.select({
+  web: {
+    boxShadow: "0 8px 16px rgba(22, 51, 38, 0.08)",
+  },
+  default: {
+    shadowColor: "#163326",
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+});
 
 export const type = {
   title: { fontSize: 32, lineHeight: 38, fontWeight: "800", color: colors.ink },
