@@ -1,6 +1,14 @@
-import { categorySpend, getTotals } from "./calculations";
+import { categorySpend, getTotals, monthTransactions } from "./calculations";
 import { activeSubscriptionTotal } from "./subscriptions";
 import { isBillPaidForMonth } from "./dates";
+import type { Transaction, Bill, Goal } from '../domain/finance';
+import type { Recurrence } from '../domain/calendar';
+type HealthInput = {
+  transactions: Transaction[]; settings: { monthlyBudget: number };
+  bills: Pick<Bill, 'paidMonth' | 'paymentHistory'>[];
+  subscriptions: (Recurrence & { amount: number; status: string })[];
+  goals: Pick<Goal, 'saved'>[];
+};
 
 export const calculateHealth = ({
   transactions,
@@ -8,8 +16,9 @@ export const calculateHealth = ({
   bills,
   subscriptions,
   goals,
-}) => {
+}: HealthInput) => {
   const totals = getTotals(transactions);
+  const insufficientData = monthTransactions(transactions).length < 3;
   const budgetRatio = settings.monthlyBudget
     ? totals.expenses / settings.monthlyBudget
     : 0;
@@ -41,9 +50,10 @@ export const calculateHealth = ({
   const topCategory = Object.entries(categories).sort((a, b) => b[1] - a[1])[0];
 
   return {
-    score,
+    insufficientData,
+    score: insufficientData ? 0 : score,
     grade:
-      score >= 85
+      insufficientData ? 'Insufficient data' : score >= 85
         ? "Excellent"
         : score >= 70
         ? "Healthy"
