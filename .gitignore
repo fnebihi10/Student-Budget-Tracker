@@ -38,5 +38,7 @@ Thumbs.db
 
 # generated files
 *.tsbuildinfo
+test-results/
+playwright-report/
 /ios
 /android
