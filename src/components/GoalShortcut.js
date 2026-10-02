@@ -17,7 +17,7 @@ export default function GoalShortcut({ navigation }) {
   const overall = totals.target ? (totals.saved / totals.target) * 100 : 0;
 
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       accessibilityLabel="Open savings goals"
       onPress={() => navigation.navigate("Goals")}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}

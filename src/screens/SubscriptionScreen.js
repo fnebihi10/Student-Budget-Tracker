@@ -26,11 +26,11 @@ export default function SubscriptionScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.close}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.close}>
           <Ionicons name="close" size={23} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Pocketwise Pro</Text>
-        <Pressable onPress={unavailable} hitSlop={10}>
+        <Pressable accessibilityRole="button" onPress={unavailable} hitSlop={10}>
           <Text style={styles.restore}>Restore</Text>
         </Pressable>
       </View>
@@ -58,7 +58,7 @@ export default function SubscriptionScreen({ navigation }) {
           ))}
         </View>
 
-        <Pressable onPress={() => setPlan("annual")} style={[styles.plan, plan === "annual" && styles.planActive]}>
+        <Pressable accessibilityRole="button" onPress={() => setPlan("annual")} style={[styles.plan, plan === "annual" && styles.planActive]}>
           <View style={styles.best}><Text style={styles.bestText}>BEST VALUE</Text></View>
           <View style={styles.radio}>{plan === "annual" ? <View style={styles.radioDot} /> : null}</View>
           <View style={styles.planCopy}>
@@ -70,7 +70,7 @@ export default function SubscriptionScreen({ navigation }) {
             <Text style={styles.priceSub}>per month</Text>
           </View>
         </Pressable>
-        <Pressable onPress={() => setPlan("monthly")} style={[styles.plan, plan === "monthly" && styles.planActive]}>
+        <Pressable accessibilityRole="button" onPress={() => setPlan("monthly")} style={[styles.plan, plan === "monthly" && styles.planActive]}>
           <View style={styles.radio}>{plan === "monthly" ? <View style={styles.radioDot} /> : null}</View>
           <View style={styles.planCopy}>
             <Text style={styles.planTitle}>Monthly</Text>
@@ -82,7 +82,7 @@ export default function SubscriptionScreen({ navigation }) {
           </View>
         </Pressable>
 
-        <AppButton title={`Continue with ${plan}`} icon="arrow-forward" onPress={unavailable} style={styles.button} />
+        <AppButton title="Purchases unavailable" disabled icon="arrow-forward" onPress={unavailable} style={styles.button} />
         <Text style={styles.disclosure}>
           Preview pricing only. Purchases are disabled until App Store billing is configured. Any live subscription must include Apple’s terms, privacy policy, renewal, and cancellation disclosures.
         </Text>

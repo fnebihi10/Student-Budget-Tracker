@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius } from "../design";
 
@@ -14,23 +14,34 @@ export default function AppButton({
 }) {
   const isSecondary = variant === "secondary";
   const isGhost = variant === "ghost";
+  const busy = useRef(false);
+  const [pending, setPending] = useState(false);
+  const isBusy = loading || pending;
+  const press = async () => {
+    if (busy.current || disabled || loading) return;
+    busy.current = true;
+    setPending(true);
+    try { await onPress?.(); }
+    finally { busy.current = false; setPending(false); }
+  };
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      disabled={disabled || loading}
-      onPress={onPress}
+      accessibilityState={{ disabled: disabled || isBusy, busy: isBusy }}
+      disabled={disabled || isBusy}
+      onPress={press}
       style={({ pressed }) => [
         styles.base,
         isSecondary && styles.secondary,
         isGhost && styles.ghost,
-        (disabled || loading) && styles.disabled,
+        (disabled || isBusy) && styles.disabled,
         pressed && styles.pressed,
         style,
       ]}
     >
-      {loading ? (
+      {isBusy ? (
         <ActivityIndicator color={isSecondary || isGhost ? colors.primary : colors.surface} />
       ) : (
         <>

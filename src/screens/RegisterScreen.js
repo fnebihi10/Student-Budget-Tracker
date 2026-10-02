@@ -4,6 +4,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -90,12 +91,13 @@ export default function RegisterScreen({ navigation }) {
         >
           <View style={[styles.formCard, isWide && styles.formCardWide]}>
           <View style={styles.top}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons
               name="arrow-back"
               size={24}
               color={colors.ink}
-              onPress={() => navigation.goBack()}
             />
+            </Pressable>
             <View style={styles.steps}>
               <View style={[styles.step, styles.stepActive]} />
               <View style={styles.step} />
@@ -113,7 +115,7 @@ export default function RegisterScreen({ navigation }) {
           </Text>
 
           <Text style={styles.label}>First name</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Name"
             value={name}
             onChangeText={setName}
             placeholder="e.g. Alex"
@@ -123,7 +125,7 @@ export default function RegisterScreen({ navigation }) {
           />
 
           <Text style={styles.label}>University or school</Text>
-          <TextInput
+          <TextInput accessibilityLabel="School"
             value={school}
             onChangeText={setSchool}
             placeholder="Optional"
@@ -133,7 +135,7 @@ export default function RegisterScreen({ navigation }) {
           />
 
           <Text style={styles.label}>Email address</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Email"
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
@@ -145,7 +147,7 @@ export default function RegisterScreen({ navigation }) {
           />
 
           <Text style={styles.label}>Password</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Password"
             value={password}
             onChangeText={setPassword}
             placeholder="At least 8 characters"
@@ -157,7 +159,7 @@ export default function RegisterScreen({ navigation }) {
           />
 
           <Text style={styles.label}>Confirm password</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Confirm password"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             placeholder="Repeat your password"
@@ -170,7 +172,7 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.label}>Monthly spending plan</Text>
           <View style={styles.moneyInput}>
             <Text style={styles.currency}>€</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Monthly plan"
               value={budget}
               onChangeText={(value) => setBudget(value.replace(/[^0-9]/g, ""))}
               placeholder="900"

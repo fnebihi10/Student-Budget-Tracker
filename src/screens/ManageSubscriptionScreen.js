@@ -25,6 +25,7 @@ import { colors, radius } from "../design";
 import { formatMoney } from "../utils/formatters";
 import { monthlyEquivalent } from "../utils/subscriptions";
 import { dateInputToIso, isValidDateInput } from "../utils/dates";
+import { validMoney } from '../domain/finance';
 
 const frequencies = ["weekly", "monthly", "yearly"];
 const reminders = [0, 1, 3, 7];
@@ -32,15 +33,15 @@ const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
 const inputDate = (value) => {
   const date = new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
 const defaultRenewal = () => {
   const date = new Date();
-  date.setDate(date.getDate() + 7);
+  date.setUTCDate(date.getUTCDate() + 7);
   return inputDate(date);
 };
 
@@ -81,11 +82,11 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
     () => isValidDateInput(nextBillingDate),
     [nextBillingDate]
   );
-  const canSave = name.trim() && numericAmount > 0 && dateValid;
+  const canSave = name.trim() && validMoney(amount) && dateValid;
   const preview = monthlyEquivalent({ amount: numericAmount, frequency });
 
-  const save = () => {
-    saveSubscription({
+  const save = async () => {
+    const saved = await saveSubscription({
       id: existing?.id,
       serviceId: existing?.serviceId || preset.id,
       name: name.trim(),
@@ -100,6 +101,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
       color: existing?.color || preset.color,
       status: existing?.status || "active",
     });
+    if (!saved) return;
     Haptics.notificationAsync(
       Haptics.NotificationFeedbackType.Success
     ).catch(() => {});
@@ -112,8 +114,8 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
       message: "This only removes the tracker entry. It will not cancel your provider subscription.",
       cancelLabel: "Keep it",
       confirmLabel: "Remove",
-      onConfirm: () => {
-        deleteSubscription(existing.id);
+      onConfirm: async () => {
+        if (!await deleteSubscription(existing.id)) return;
         navigation.goBack();
       },
     });
@@ -125,14 +127,14 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
         style={styles.flex}
       >
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.close}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.close}>
             <Ionicons name="close" size={23} color={colors.ink} />
           </Pressable>
           <Text style={styles.headerTitle}>
             {existing ? "Edit subscription" : "Add subscription"}
           </Text>
           {existing ? (
-            <Pressable onPress={confirmDelete} style={styles.close}>
+            <Pressable accessibilityRole="button" onPress={confirmDelete} style={styles.close}>
               <Ionicons name="trash-outline" size={20} color={colors.red} />
             </Pressable>
           ) : (
@@ -167,7 +169,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
           </View>
 
           <Text style={styles.label}>Service name</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Name"
             value={name}
             onChangeText={setName}
             placeholder="e.g. Netflix"
@@ -182,7 +184,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
             <Text style={styles.currency}>
               {currencySymbols[settings.currency] || settings.currency}
             </Text>
-            <TextInput
+            <TextInput accessibilityLabel="Amount"
               value={amount}
               onChangeText={(value) =>
                 setAmount(value.replace(/[^0-9.,]/g, ""))
@@ -197,7 +199,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
           <Text style={styles.label}>Billing frequency</Text>
           <View style={styles.segment}>
             {frequencies.map((item) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={item}
                 onPress={() => setFrequency(item)}
                 style={[
@@ -241,7 +243,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
               size={19}
               color={colors.primary}
             />
-            <TextInput
+            <TextInput accessibilityLabel="Next billing date YYYY-MM-DD"
               value={nextBillingDate}
               onChangeText={setNextBillingDate}
               keyboardType="numbers-and-punctuation"
@@ -262,7 +264,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
             contentContainerStyle={styles.chips}
           >
             {subscriptionCategories.map((item) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={item.id}
                 onPress={() => setCategory(item.id)}
                 style={[
@@ -292,7 +294,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
           <Text style={styles.label}>Reminder</Text>
           <View style={styles.reminders}>
             {reminders.map((days) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={days}
                 onPress={() => setReminderDays(days)}
                 style={[
@@ -331,7 +333,7 @@ export default function ManageSubscriptionScreen({ navigation, route }) {
           </View>
 
           <Text style={styles.label}>Notes (optional)</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Notes"
             value={notes}
             onChangeText={setNotes}
             placeholder="Plan, student discount, cancellation details..."

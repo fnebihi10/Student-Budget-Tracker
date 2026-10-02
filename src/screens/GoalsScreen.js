@@ -34,11 +34,11 @@ export default function GoalsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Savings goals</Text>
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel="Add savings goal"
           onPress={() => navigation.navigate("ManageGoal")}
           style={styles.add}
         >
@@ -114,7 +114,7 @@ export default function GoalsScreen({ navigation }) {
             contentContainerStyle={styles.templates}
           >
             {goalTemplates.slice(0, -1).map((template) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={template.id}
                 onPress={() =>
                   navigation.navigate("ManageGoal", {
@@ -212,7 +212,7 @@ function GoalCard({ goal, currency, onPress, completed = false }) {
   const progress = goalProgress(goal);
   const days = goalDaysLeft(goal);
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.goalCard, pressed && styles.pressed]}
     >

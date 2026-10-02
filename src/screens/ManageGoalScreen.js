@@ -22,20 +22,21 @@ import { colors, radius } from "../design";
 import { formatMoney, shortDate } from "../utils/formatters";
 import { goalProgress, goalRemaining, monthlyGoalPace } from "../utils/goals";
 import { dateInputToIso, isValidDateInput } from "../utils/dates";
+import { openingBalance, validMoney } from '../domain/finance';
 
 const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
 const inputDate = (value) => {
   const date = new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
 const defaultDeadline = () => {
   const date = new Date();
-  date.setDate(date.getDate() + 120);
+  date.setUTCDate(date.getUTCDate() + 120);
   return inputDate(date);
 };
 
@@ -73,7 +74,7 @@ export default function ManageGoalScreen({ navigation, route }) {
   const numericTarget = Number(target.replace(",", "."));
   const numericInitial = Number(initialSaved.replace(",", ".")) || 0;
   const dateValid = useMemo(() => isValidDateInput(deadline), [deadline]);
-  const canSave = name.trim() && numericTarget > 0 && dateValid;
+  const canSave = name.trim() && validMoney(target) && (!initialSaved || validMoney(initialSaved, true)) && dateValid;
 
   const chooseTemplate = (id) => {
     const selected = goalTemplateById(id);
@@ -86,32 +87,34 @@ export default function ManageGoalScreen({ navigation, route }) {
     }
   };
 
-  const save = () => {
-    saveGoal({
+  const save = async () => {
+    const saved = await saveGoal({
       id: existing?.id,
       templateId,
       name: name.trim(),
       target: numericTarget,
-      ...(existing ? {} : { saved: Math.min(numericInitial, numericTarget) }),
+      ...(existing ? {} : { saved: numericInitial }),
       deadline: dateInputToIso(deadline),
       icon: template.icon,
       color: template.color,
       notes: notes.trim(),
     });
+    if (!saved) return;
     Haptics.notificationAsync(
       Haptics.NotificationFeedbackType.Success
     ).catch(() => {});
     navigation.goBack();
   };
 
-  const recordContribution = () => {
+  const recordContribution = async () => {
     const amount = Number(contribution.replace(",", "."));
     if (!amount) return;
-    addGoalActivity(
+    const saved = await addGoalActivity(
       existing.id,
       contributionMode === "add" ? amount : -amount,
       contributionNote
     );
+    if (!saved) return;
     setContribution("");
     setContributionNote("");
     setShowContribution(false);
@@ -124,8 +127,8 @@ export default function ManageGoalScreen({ navigation, route }) {
       message: "The goal and its contribution history will be permanently removed.",
       cancelLabel: "Keep it",
       confirmLabel: "Delete",
-      onConfirm: () => {
-        deleteGoal(existing.id);
+      onConfirm: async () => {
+        if (!await deleteGoal(existing.id)) return;
         navigation.goBack();
       },
     });
@@ -137,14 +140,14 @@ export default function ManageGoalScreen({ navigation, route }) {
         style={styles.flex}
       >
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.close}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.close}>
             <Ionicons name="close" size={23} color={colors.ink} />
           </Pressable>
           <Text style={styles.headerTitle}>
             {existing ? "Manage goal" : "New savings goal"}
           </Text>
           {existing ? (
-            <Pressable onPress={confirmDelete} style={styles.close}>
+            <Pressable accessibilityRole="button" onPress={confirmDelete} style={styles.close}>
               <Ionicons name="trash-outline" size={20} color={colors.red} />
             </Pressable>
           ) : (
@@ -187,7 +190,7 @@ export default function ManageGoalScreen({ navigation, route }) {
                   {formatMoney(goalRemaining(existing), settings.currency)} left
                 </Text>
               </View>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 onPress={() => {
                   setContributionMode("add");
                   setShowContribution(true);
@@ -206,7 +209,7 @@ export default function ManageGoalScreen({ navigation, route }) {
                 contentContainerStyle={styles.templates}
               >
                 {goalTemplates.map((item) => (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     key={item.id}
                     onPress={() => chooseTemplate(item.id)}
                     style={[
@@ -248,7 +251,7 @@ export default function ManageGoalScreen({ navigation, route }) {
           )}
 
           <Text style={styles.label}>Goal name</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Name"
             value={name}
             onChangeText={setName}
             placeholder="e.g. Emergency cushion"
@@ -263,7 +266,7 @@ export default function ManageGoalScreen({ navigation, route }) {
             <Text style={styles.currency}>
               {currencySymbols[settings.currency] || settings.currency}
             </Text>
-            <TextInput
+            <TextInput accessibilityLabel="Savings target"
               value={target}
               onChangeText={(value) =>
                 setTarget(value.replace(/[^0-9.,]/g, ""))
@@ -278,7 +281,7 @@ export default function ManageGoalScreen({ navigation, route }) {
           {!existing ? (
             <>
               <Text style={styles.label}>Already saved (optional)</Text>
-              <TextInput
+              <TextInput accessibilityLabel="Starting saved balance"
                 value={initialSaved}
                 onChangeText={(value) =>
                   setInitialSaved(value.replace(/[^0-9.,]/g, ""))
@@ -298,7 +301,7 @@ export default function ManageGoalScreen({ navigation, route }) {
               size={19}
               color={colors.primary}
             />
-            <TextInput
+            <TextInput accessibilityLabel="Deadline YYYY-MM-DD"
               value={deadline}
               onChangeText={setDeadline}
               keyboardType="numbers-and-punctuation"
@@ -334,7 +337,7 @@ export default function ManageGoalScreen({ navigation, route }) {
           ) : null}
 
           <Text style={styles.label}>Why this matters (optional)</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Notes"
             value={notes}
             onChangeText={setNotes}
             placeholder="A short promise to your future self..."
@@ -377,16 +380,17 @@ export default function ManageGoalScreen({ navigation, route }) {
             style={styles.save}
           />
 
+          {existing ? <Text style={styles.historyTitle}>Starting balance: {formatMoney(openingBalance(existing), settings.currency)}. Contributions track savings transfers separately from income and expenses.</Text> : null}
           {existing?.activity?.length ? (
             <View style={styles.historySection}>
               <Text style={styles.historyTitle}>Contribution history</Text>
               <View style={styles.historyCard}>
-                {existing.activity.slice(0, 8).map((item, index) => (
+                {existing.activity.map((item, index) => (
                   <View
                     key={item.id}
                     style={[
                       styles.historyRow,
-                      index < Math.min(existing.activity.length, 8) - 1 &&
+                      index < existing.activity.length - 1 &&
                         styles.historyDivider,
                     ]}
                   >
@@ -438,7 +442,7 @@ export default function ManageGoalScreen({ navigation, route }) {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.modalShade}
         >
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={StyleSheet.absoluteFill}
             onPress={() => setShowContribution(false)}
           />
@@ -456,7 +460,7 @@ export default function ManageGoalScreen({ navigation, route }) {
               <Text style={styles.currency}>
                 {currencySymbols[settings.currency] || settings.currency}
               </Text>
-              <TextInput
+              <TextInput accessibilityLabel="Contribution amount"
                 value={contribution}
                 onChangeText={(value) =>
                   setContribution(value.replace(/[^0-9.,]/g, ""))
@@ -468,7 +472,7 @@ export default function ManageGoalScreen({ navigation, route }) {
                 style={styles.amountInput}
               />
             </View>
-            <TextInput
+            <TextInput accessibilityLabel="Contribution note"
               value={contributionNote}
               onChangeText={setContributionNote}
               placeholder="Note (optional)"

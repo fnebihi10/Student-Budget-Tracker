@@ -67,7 +67,7 @@ export default function TransactionsScreen({ navigation }) {
           <Text style={styles.eyebrow}>YOUR MONEY TRAIL</Text>
           <Text style={styles.title}>Activity</Text>
         </View>
-        <Pressable onPress={() => navigation.navigate("AddTransaction")} style={styles.add}>
+        <Pressable accessibilityRole="button" onPress={() => navigation.navigate("AddTransaction")} style={styles.add}>
           <Ionicons name="add" size={25} color={colors.surface} />
         </Pressable>
       </View>
@@ -115,7 +115,7 @@ export default function TransactionsScreen({ navigation }) {
 
       <View style={styles.filters}>
         {filters.map((item) => (
-          <Pressable
+          <Pressable accessibilityRole="button"
             key={item}
             onPress={() => setFilter(item)}
             style={[styles.filter, filter === item && styles.filterActive]}

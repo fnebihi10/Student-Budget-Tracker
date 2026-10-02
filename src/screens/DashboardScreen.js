@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useContext, useMemo } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import EmptyState from "../components/EmptyState";
@@ -15,11 +15,17 @@ import { colors, radius, shadow, type } from "../design";
 import { getTotals } from "../utils/calculations";
 import { formatMoney, monthLabel } from "../utils/formatters";
 import { isBillPaidForMonth } from "../utils/dates";
+import { SubscriptionsContext } from '../context/SubscriptionsContext';
+import { SplitsContext } from '../context/SplitsContext';
+import { budgetEstimate } from '../domain/budgetEstimate';
 
 export default function DashboardScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const isWide = width >= 900;
   const { transactions, bills, profile, settings, toggleBill } = useContext(BudgetContext);
+  const { subscriptions } = useContext(SubscriptionsContext);
+  const { splits } = useContext(SplitsContext);
+  const [showAssumptions, setShowAssumptions] = useState(false);
   const totals = useMemo(() => getTotals(transactions), [transactions]);
   const current = useMemo(
     () =>
@@ -27,7 +33,7 @@ export default function DashboardScreen({ navigation }) {
         .filter((item) => {
           const date = new Date(item.date);
           const now = new Date();
-          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+          return date.getUTCMonth() === now.getUTCMonth() && date.getUTCFullYear() === now.getUTCFullYear();
         })
         .sort((a, b) => new Date(b.date) - new Date(a.date)),
     [transactions]
@@ -36,9 +42,10 @@ export default function DashboardScreen({ navigation }) {
   const date = new Date();
   const daysLeft = Math.max(
     1,
-    new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() - date.getDate() + 1
+    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate() - date.getUTCDate() + 1
   );
-  const weeklySafe = Math.max(0, (remaining / daysLeft) * 7);
+  const estimate = budgetEstimate({ budget: settings.monthlyBudget, transactions, bills, subscriptions, debts: splits });
+  const weeklySafe = estimate.estimate;
   const progress = Math.min((totals.expenses / Math.max(settings.monthlyBudget, 1)) * 100, 100);
   const nextBill = bills
     .filter((bill) => !isBillPaidForMonth(bill))
@@ -54,7 +61,7 @@ export default function DashboardScreen({ navigation }) {
               Hi {profile.name || "there"} <Text style={styles.wave}>✦</Text>
             </Text>
           </View>
-          <Pressable
+          <Pressable accessibilityRole="button"
             accessibilityLabel="Open profile"
             onPress={() => navigation.navigate("Profile")}
             style={styles.avatar}
@@ -72,8 +79,8 @@ export default function DashboardScreen({ navigation }) {
         >
           <View style={styles.heroTop}>
             <View>
-              <Text style={styles.heroLabel}>SAFE TO SPEND</Text>
-              <Text style={styles.heroValue}>{formatMoney(Math.max(remaining, 0), settings.currency)}</Text>
+              <Text style={styles.heroLabel}>BUDGET AFTER COMMITMENTS</Text>
+              <Text style={styles.heroValue}>{formatMoney(Math.max(remaining - estimate.reserved, 0), settings.currency)}</Text>
             </View>
             <View style={styles.monthPill}>
               <Text style={styles.monthPillText}>{daysLeft} days left</Text>
@@ -95,12 +102,17 @@ export default function DashboardScreen({ navigation }) {
               <Ionicons name="calendar-outline" color={colors.primaryDark} size={18} />
             </View>
             <View style={styles.weeklyCopy}>
-              <Text style={styles.weeklyLabel}>Your weekly pace</Text>
+              <Text style={styles.weeklyLabel}>Estimate for the next {estimate.days} days</Text>
               <Text style={styles.weeklyText}>
-                About {formatMoney(weeklySafe, settings.currency)} is comfortable this week.
+                {formatMoney(weeklySafe, settings.currency)} after reserving {formatMoney(estimate.reserved, settings.currency)}.
               </Text>
             </View>
           </View>
+          <Text style={styles.heroSmall}>A budget estimate; no bank balance is verified.</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showAssumptions }} onPress={() => setShowAssumptions((value) => !value)} hitSlop={8}>
+            <Text style={styles.heroSmall}>{showAssumptions ? 'Hide estimate assumptions' : 'Show estimate assumptions'}</Text>
+          </Pressable>
+          {showAssumptions ? <Text style={styles.heroSmall}>{estimate.assumptions}</Text> : null}
         </LinearGradient>
 
         <View style={[styles.overviewSide, isWide && styles.overviewSideWide]}>
@@ -119,14 +131,14 @@ export default function DashboardScreen({ navigation }) {
           />
           <SummaryCard
             icon="wallet-outline"
-            label="Balance"
+            label="Monthly net"
             value={formatMoney(totals.balance, settings.currency, true)}
             color={colors.blue}
           />
         </View>
 
         {nextBill ? (
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() => toggleBill(nextBill.id)}
             style={({ pressed }) => [styles.bill, pressed && styles.pressed]}
           >
@@ -186,7 +198,7 @@ export default function DashboardScreen({ navigation }) {
           )}
         </View>
 
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={() => navigation.navigate("Reports")}
           style={({ pressed }) => [styles.insight, pressed && styles.pressed]}
         >
@@ -203,7 +215,7 @@ export default function DashboardScreen({ navigation }) {
         </Pressable>
       </ScrollView>
 
-      <Pressable
+      <Pressable accessibilityRole="button"
         accessibilityLabel="Add a transaction"
         onPress={() => navigation.navigate("AddTransaction")}
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}

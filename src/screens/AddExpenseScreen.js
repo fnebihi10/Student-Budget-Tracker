@@ -20,13 +20,14 @@ import { expenseCategories, incomeCategories } from "../data/categories";
 import { colors, radius } from "../design";
 import { dateInputToIso, isValidDateInput } from "../utils/dates";
 import { confirmAction } from "../utils/dialogs";
+import { validMoney } from '../domain/finance';
 
 const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
 const formatInputDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
@@ -45,14 +46,14 @@ export default function AddExpenseScreen({ navigation, route }) {
   const [recurring, setRecurring] = useState(Boolean(existing?.recurring));
   const categories = type === "expense" ? expenseCategories : incomeCategories;
   const validDate = useMemo(() => isValidDateInput(date), [date]);
-  const canSave = Number(amount.replace(",", ".")) > 0 && title.trim() && validDate;
+  const canSave = validMoney(amount) && title.trim() && validDate;
 
   const chooseType = (next) => {
     setType(next);
     setCategory(next === "expense" ? "food" : "salary");
   };
 
-  const save = () => {
+  const save = async () => {
     const transaction = {
       type,
       amount: Number(amount.replace(",", ".")),
@@ -62,9 +63,9 @@ export default function AddExpenseScreen({ navigation, route }) {
       category,
       recurring,
     };
-    const saved = existing
+    const saved = await (existing
       ? updateTransaction(existing.id, transaction)
-      : addTransaction(transaction);
+      : addTransaction(transaction));
     if (!saved) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     navigation.goBack();
@@ -76,8 +77,8 @@ export default function AddExpenseScreen({ navigation, route }) {
       message: "This transaction will be permanently removed.",
       cancelLabel: "Keep it",
       confirmLabel: "Delete",
-      onConfirm: () => {
-        deleteTransaction(existing.id);
+      onConfirm: async () => {
+        if (!await deleteTransaction(existing.id)) return;
         navigation.goBack();
       },
     });
@@ -86,7 +87,7 @@ export default function AddExpenseScreen({ navigation, route }) {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.close}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.close}>
             <Ionicons name="close" size={23} color={colors.ink} />
           </Pressable>
           <Text style={styles.headerTitle}>{existing ? "Edit transaction" : "New transaction"}</Text>
@@ -100,7 +101,7 @@ export default function AddExpenseScreen({ navigation, route }) {
         >
           <View style={styles.segment}>
             {["expense", "income"].map((item) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={item}
                 onPress={() => chooseType(item)}
                 style={[styles.segmentItem, type === item && styles.segmentActive]}
@@ -120,23 +121,24 @@ export default function AddExpenseScreen({ navigation, route }) {
           <Text style={styles.amountLabel}>HOW MUCH?</Text>
           <View style={styles.amountRow}>
             <Text style={styles.symbol}>{currencySymbols[settings.currency] || settings.currency}</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Amount"
               value={amount}
               onChangeText={(value) => setAmount(value.replace(/[^0-9.,]/g, ""))}
               autoFocus
               keyboardType="decimal-pad"
               placeholder="0"
               placeholderTextColor="#B9C1BC"
-              style={styles.amountInput}
+              style={[styles.amountInput, amount.length > 7 && { fontSize: 32 }]}
               maxLength={12}
             />
           </View>
 
           <Text style={styles.label}>Category</Text>
+          {amount && !validMoney(amount) ? <Text accessibilityRole="alert" style={styles.error}>Enter a positive amount with at most two decimal places.</Text> : null}
           <CategoryPicker categories={categories} value={category} onChange={setCategory} />
 
           <Text style={styles.label}>Description</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Description"
             value={title}
             onChangeText={setTitle}
             placeholder={type === "expense" ? "e.g. Groceries" : "e.g. Campus job"}
@@ -150,7 +152,7 @@ export default function AddExpenseScreen({ navigation, route }) {
               <Text style={styles.label}>Date</Text>
               <View style={styles.fieldIcon}>
                 <Ionicons name="calendar-outline" size={19} color={colors.primary} />
-                <TextInput
+                <TextInput accessibilityLabel="Date YYYY-MM-DD"
                   value={date}
                   onChangeText={setDate}
                   placeholder="YYYY-MM-DD"
@@ -165,7 +167,7 @@ export default function AddExpenseScreen({ navigation, route }) {
           </View>
 
           <Text style={styles.label}>Note (optional)</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Note"
             value={note}
             onChangeText={setNote}
             placeholder="Anything worth remembering?"

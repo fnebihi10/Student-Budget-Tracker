@@ -14,41 +14,30 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppButton from "../components/AppButton";
-import { BudgetContext } from "../context/BudgetContext";
-import { GoalsContext } from "../context/GoalsContext";
-import { SplitsContext } from "../context/SplitsContext";
-import { SubscriptionsContext } from "../context/SubscriptionsContext";
 import { colors, radius, type } from "../design";
 import { AuthContext } from "../context/AuthContext";
 
 const features = [
-  ["sparkles-outline", "Know what is safe to spend"],
+  ["sparkles-outline", "Estimate your budget after commitments"],
   ["pie-chart-outline", "Plan every student expense"],
   ["shield-checkmark-outline", "Private account with secure cloud sync"],
 ];
 
 export default function LoginScreen({ navigation }) {
-  const { loadDemo } = useContext(BudgetContext);
   const {
     signIn,
     startDemo,
     authError,
     resendConfirmation,
     clearAuthError,
+    requestPasswordReset,
   } = useContext(AuthContext);
-  const { loadDemoGoals } = useContext(GoalsContext);
-  const { loadDemoSubscriptions } = useContext(SubscriptionsContext);
-  const { loadDemoSplits } = useContext(SplitsContext);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
 
   const loadAllDemo = () => {
-    loadDemo();
-    loadDemoGoals();
-    loadDemoSubscriptions();
-    loadDemoSplits();
     startDemo();
   };
 
@@ -70,6 +59,14 @@ export default function LoginScreen({ navigation }) {
     if (!error) {
       setResendMessage("A new confirmation email was sent. Use only the newest link.");
     }
+  };
+
+  const resetPassword = async () => {
+    if (!email.trim()) return;
+    setLoading(true);
+    const { error } = await requestPasswordReset(email);
+    setLoading(false);
+    if (!error) setResendMessage('If this email has an account, a reset link has been sent. Open it on this device.');
   };
 
   return (
@@ -131,7 +128,7 @@ export default function LoginScreen({ navigation }) {
           </View>
         </View>
 
-        <TextInput
+        <TextInput accessibilityLabel="Email"
           value={email}
           onChangeText={setEmail}
           placeholder="Email address"
@@ -141,7 +138,7 @@ export default function LoginScreen({ navigation }) {
           autoComplete="email"
           style={styles.input}
         />
-        <TextInput
+        <TextInput accessibilityLabel="Password"
           value={password}
           onChangeText={setPassword}
           placeholder="Password"
@@ -164,6 +161,7 @@ export default function LoginScreen({ navigation }) {
             <Text style={styles.authErrorText}>{authError}</Text>
           </View>
         ) : null}
+        <AppButton title="Forgot password?" variant="ghost" disabled={!email.trim() || loading} onPress={resetPassword} />
         {authError?.toLowerCase().includes("confirm") ||
         authError?.toLowerCase().includes("expired") ? (
           <AppButton
@@ -183,7 +181,7 @@ export default function LoginScreen({ navigation }) {
           onPress={() => navigation.navigate("Setup")}
           style={styles.create}
         />
-        <Pressable onPress={loadAllDemo} style={styles.demo}>
+        <Pressable accessibilityRole="button" onPress={loadAllDemo} style={styles.demo}>
           <Text style={styles.demoText}>Explore with demo data</Text>
         </Pressable>
         </ScrollView>

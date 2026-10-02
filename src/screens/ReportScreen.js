@@ -10,9 +10,10 @@ import { BudgetContext } from "../context/BudgetContext";
 import { categoryById } from "../data/categories";
 import { colors, radius, type } from "../design";
 import { categorySpend, getTotals } from "../utils/calculations";
-import { formatMoney, isSameMonth } from "../utils/formatters";
+import { formatMoney } from "../utils/formatters";
+import { monthStart } from '../domain/calendar';
 
-const monthKey = (date) => `${date.getFullYear()}-${date.getMonth()}`;
+const monthKey = (date) => `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
 
 export default function ReportScreen({ navigation }) {
   const { transactions, settings } = useContext(BudgetContext);
@@ -31,25 +32,22 @@ export default function ReportScreen({ navigation }) {
   );
   const now = new Date();
   const isCurrentMonth =
-    selectedMonth.getFullYear() === now.getFullYear() &&
-    selectedMonth.getMonth() === now.getMonth();
+    selectedMonth.getUTCFullYear() === now.getUTCFullYear() &&
+    selectedMonth.getUTCMonth() === now.getUTCMonth();
   const daysElapsed = isCurrentMonth
-    ? now.getDate()
-    : new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
+    ? now.getUTCDate()
+    : new Date(Date.UTC(selectedMonth.getUTCFullYear(), selectedMonth.getUTCMonth() + 1, 0)).getUTCDate();
   const savingsRate = totals.income > 0 ? ((totals.income - totals.expenses) / totals.income) * 100 : 0;
   const maxCategory = ranked[0]?.[1] || 1;
 
   const months = useMemo(() => {
     const result = [];
     for (let offset = 3; offset >= 0; offset -= 1) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - offset);
-      const amount = transactions
-        .filter((item) => item.type === "expense" && isSameMonth(item.date, date))
-        .reduce((sum, item) => sum + Number(item.amount), 0);
+      const date = monthStart(new Date(), -offset);
+      const amount = getTotals(transactions, date).expenses;
       result.push({
         key: monthKey(date),
-        label: new Intl.DateTimeFormat("en", { month: "short" }).format(date),
+        label: new Intl.DateTimeFormat("en", { timeZone: 'UTC', month: "short" }).format(date),
         amount,
       });
     }

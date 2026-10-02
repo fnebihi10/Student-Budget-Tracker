@@ -19,20 +19,21 @@ import { SplitsContext } from "../context/SplitsContext";
 import { splitCategories } from "../data/splitCategories";
 import { colors, radius } from "../design";
 import { dateInputToIso, isValidDateInput } from "../utils/dates";
+import { validMoney } from '../domain/finance';
 
 const currencySymbols = { EUR: "€", USD: "$", GBP: "£", HUF: "Ft" };
 
 const inputDate = (value) => {
   const date = new Date(value);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
     2,
     "0"
-  )}-${String(date.getDate()).padStart(2, "0")}`;
+  )}-${String(date.getUTCDate()).padStart(2, "0")}`;
 };
 
 const defaultDue = () => {
   const date = new Date();
-  date.setDate(date.getDate() + 7);
+  date.setUTCDate(date.getUTCDate() + 7);
   return inputDate(date);
 };
 
@@ -56,10 +57,10 @@ export default function ManageSplitScreen({ navigation, route }) {
   const numericAmount = Number(amount.replace(",", "."));
   const dateValid = useMemo(() => isValidDateInput(dueDate), [dueDate]);
   const canSave =
-    title.trim() && person.trim() && numericAmount > 0 && dateValid;
+    title.trim() && person.trim() && validMoney(amount) && dateValid;
 
-  const save = () => {
-    saveSplit({
+  const save = async () => {
+    const saved = await saveSplit({
       id: existing?.id,
       direction,
       title: title.trim(),
@@ -70,6 +71,7 @@ export default function ManageSplitScreen({ navigation, route }) {
       note: note.trim(),
       status: existing?.status || "open",
     });
+    if (!saved) return;
     Haptics.notificationAsync(
       Haptics.NotificationFeedbackType.Success
     ).catch(() => {});
@@ -82,8 +84,8 @@ export default function ManageSplitScreen({ navigation, route }) {
       message: "This shared-expense record will be permanently removed.",
       cancelLabel: "Keep it",
       confirmLabel: "Remove",
-      onConfirm: () => {
-        deleteSplit(existing.id);
+      onConfirm: async () => {
+        if (!await deleteSplit(existing.id)) return;
         navigation.goBack();
       },
     });
@@ -95,14 +97,14 @@ export default function ManageSplitScreen({ navigation, route }) {
         style={styles.flex}
       >
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.close}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.close}>
             <Ionicons name="close" size={23} color={colors.ink} />
           </Pressable>
           <Text style={styles.headerTitle}>
             {existing ? "Edit shared expense" : "New shared expense"}
           </Text>
           {existing ? (
-            <Pressable onPress={confirmDelete} style={styles.close}>
+            <Pressable accessibilityRole="button" onPress={confirmDelete} style={styles.close}>
               <Ionicons name="trash-outline" size={20} color={colors.red} />
             </Pressable>
           ) : (
@@ -116,7 +118,7 @@ export default function ManageSplitScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.segment}>
-            <Pressable
+            <Pressable accessibilityRole="button"
               onPress={() => setDirection("owed_to_me")}
               style={[
                 styles.segmentItem,
@@ -139,7 +141,7 @@ export default function ManageSplitScreen({ navigation, route }) {
                 They owe me
               </Text>
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button"
               onPress={() => setDirection("i_owe")}
               style={[
                 styles.segmentItem,
@@ -176,7 +178,7 @@ export default function ManageSplitScreen({ navigation, route }) {
           </View>
 
           <Text style={styles.label}>What was it for?</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Description"
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Apartment groceries"
@@ -189,7 +191,7 @@ export default function ManageSplitScreen({ navigation, route }) {
           <Text style={styles.label}>
             {direction === "owed_to_me" ? "Who owes you?" : "Who do you owe?"}
           </Text>
-          <TextInput
+          <TextInput accessibilityLabel="Person"
             value={person}
             onChangeText={setPerson}
             placeholder="Name or group"
@@ -204,7 +206,7 @@ export default function ManageSplitScreen({ navigation, route }) {
             <Text style={styles.currency}>
               {currencySymbols[settings.currency] || settings.currency}
             </Text>
-            <TextInput
+            <TextInput accessibilityLabel="Amount"
               value={amount}
               onChangeText={(value) =>
                 setAmount(value.replace(/[^0-9.,]/g, ""))
@@ -223,7 +225,7 @@ export default function ManageSplitScreen({ navigation, route }) {
             contentContainerStyle={styles.categories}
           >
             {splitCategories.map((item) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={item.id}
                 onPress={() => setCategory(item.id)}
                 style={[
@@ -269,7 +271,7 @@ export default function ManageSplitScreen({ navigation, route }) {
               size={19}
               color={colors.primary}
             />
-            <TextInput
+            <TextInput accessibilityLabel="Due date YYYY-MM-DD"
               value={dueDate}
               onChangeText={setDueDate}
               keyboardType="numbers-and-punctuation"
@@ -284,7 +286,7 @@ export default function ManageSplitScreen({ navigation, route }) {
           ) : null}
 
           <Text style={styles.label}>Note (optional)</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Note"
             value={note}
             onChangeText={setNote}
             placeholder="Receipt, context, or payment details..."

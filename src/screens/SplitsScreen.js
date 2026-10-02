@@ -42,11 +42,11 @@ export default function SplitsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Split & settle</Text>
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel="Add personal debt"
           onPress={() => navigation.navigate("ManageSplit")}
           style={styles.add}
         >
@@ -99,7 +99,7 @@ export default function SplitsScreen({ navigation }) {
         </LinearGradient>
 
         <View style={styles.quick}>
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() =>
               navigation.navigate("ManageSplit", { direction: "owed_to_me" })
             }
@@ -113,7 +113,7 @@ export default function SplitsScreen({ navigation }) {
               <Text style={styles.quickText}>I paid for someone</Text>
             </View>
           </Pressable>
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() =>
               navigation.navigate("ManageSplit", { direction: "i_owe" })
             }
@@ -212,7 +212,7 @@ function SplitRow({
   const incoming = item.direction === "owed_to_me";
   return (
     <View style={[styles.rowWrap, !last && styles.rowDivider]}>
-      <Pressable
+      <Pressable accessibilityRole="button"
         onPress={onPress}
         onLongPress={onLongPress}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
@@ -249,7 +249,7 @@ function SplitRow({
           {formatMoney(item.amount, currency)}
         </Text>
       </Pressable>
-      <Pressable
+      <Pressable accessibilityRole="button"
         accessibilityLabel={settled ? "Reopen balance" : "Mark balance settled"}
         onPress={onSettle}
         style={[styles.settle, settled && styles.reopen]}

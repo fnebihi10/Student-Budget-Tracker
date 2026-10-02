@@ -13,7 +13,8 @@ import { categoryById } from "../data/categories";
 import { colors, radius } from "../design";
 import { formatMoney } from "../utils/formatters";
 import { isBillPaidForMonth } from "../utils/dates";
-import { getNextRenewal } from "../utils/subscriptions";
+import { renewalsBetween } from "../utils/subscriptions";
+import { monthStart } from '../domain/calendar';
 
 const typeConfig = {
   transaction: { label: "Activity", color: colors.coral, icon: "receipt-outline" },
@@ -25,15 +26,15 @@ const typeConfig = {
 
 const dateKey = (date) => {
   const value = new Date(date);
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(
     2,
     "0"
-  )}-${String(value.getDate()).padStart(2, "0")}`;
+  )}-${String(value.getUTCDate()).padStart(2, "0")}`;
 };
 
 const sameMonth = (date, month) =>
-  date.getMonth() === month.getMonth() &&
-  date.getFullYear() === month.getFullYear();
+  date.getUTCMonth() === month.getUTCMonth() &&
+  date.getUTCFullYear() === month.getUTCFullYear();
 
 export default function MoneyCalendarScreen({ navigation }) {
   const budget = useContext(BudgetContext);
@@ -41,7 +42,7 @@ export default function MoneyCalendarScreen({ navigation }) {
   const { goals } = useContext(GoalsContext);
   const { splits } = useContext(SplitsContext);
   const [month, setMonth] = useState(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1))
   );
   const [selected, setSelected] = useState(dateKey(new Date()));
   const [filter, setFilter] = useState("all");
@@ -49,10 +50,10 @@ export default function MoneyCalendarScreen({ navigation }) {
   const events = useMemo(() => {
     const result = [];
     const lastDay = new Date(
-      month.getFullYear(),
-      month.getMonth() + 1,
-      0
-    ).getDate();
+      Date.UTC(month.getUTCFullYear(),
+      month.getUTCMonth() + 1,
+      0)
+    ).getUTCDate();
 
     budget.transactions.forEach((item) => {
       const date = new Date(item.date);
@@ -73,10 +74,10 @@ export default function MoneyCalendarScreen({ navigation }) {
 
     budget.bills.forEach((bill) => {
       const date = new Date(
-        month.getFullYear(),
-        month.getMonth(),
+        Date.UTC(month.getUTCFullYear(),
+        month.getUTCMonth(),
         Math.min(bill.dueDay, lastDay),
-        12
+        12)
       );
       const category = categoryById(bill.category);
       result.push({
@@ -94,10 +95,9 @@ export default function MoneyCalendarScreen({ navigation }) {
     subscriptions
       .filter((item) => item.status === "active")
       .forEach((item) => {
-        const start = new Date(month.getFullYear(), month.getMonth(), 1, 12);
-        const renewal = getNextRenewal(item, start);
-        if (!sameMonth(renewal, month)) return;
+        const renewals = renewalsBetween(item, monthStart(month), monthStart(month, 1));
         const service = serviceById(item.serviceId);
+        renewals.forEach((renewal) => {
         result.push({
           id: `subscription-${item.id}-${dateKey(renewal)}`,
           type: "subscription",
@@ -107,6 +107,7 @@ export default function MoneyCalendarScreen({ navigation }) {
           amount: item.amount,
           icon: item.icon || service.icon,
           color: item.color || service.color,
+        });
         });
       });
 
@@ -164,25 +165,25 @@ export default function MoneyCalendarScreen({ navigation }) {
   const selectedEvents = visibleEvents.filter(
     (event) => dateKey(event.date) === selected
   );
-  const monthTitle = new Intl.DateTimeFormat("en", {
+  const monthTitle = new Intl.DateTimeFormat("en", { timeZone: 'UTC',
     month: "long",
     year: "numeric",
   }).format(month);
-  const selectedTitle = new Intl.DateTimeFormat("en", {
+  const selectedTitle = new Intl.DateTimeFormat("en", { timeZone: 'UTC',
     weekday: "long",
     month: "long",
     day: "numeric",
-  }).format(new Date(`${selected}T12:00:00`));
+  }).format(new Date(`${selected}T12:00:00Z`));
 
   const moveMonth = (offset) => {
-    const next = new Date(month.getFullYear(), month.getMonth() + offset, 1);
+    const next = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + offset, 1));
     setMonth(next);
     const today = new Date();
     setSelected(
       dateKey(
         sameMonth(today, next)
           ? today
-          : new Date(next.getFullYear(), next.getMonth(), 1, 12)
+          : new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), 1, 12))
       )
     );
   };
@@ -190,14 +191,14 @@ export default function MoneyCalendarScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Money calendar</Text>
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={() => {
             const today = new Date();
-            setMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+            setMonth(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)));
             setSelected(dateKey(today));
           }}
           style={styles.today}
@@ -212,14 +213,14 @@ export default function MoneyCalendarScreen({ navigation }) {
       >
         <View style={styles.calendar}>
           <View style={styles.monthRow}>
-            <Pressable onPress={() => moveMonth(-1)} style={styles.monthButton}>
+            <Pressable accessibilityRole="button" onPress={() => moveMonth(-1)} style={styles.monthButton}>
               <Ionicons name="chevron-back" size={20} color={colors.primary} />
             </Pressable>
             <View style={styles.monthCopy}>
               <Text style={styles.monthLabel}>UNIFIED TIMELINE</Text>
               <Text style={styles.monthTitle}>{monthTitle}</Text>
             </View>
-            <Pressable onPress={() => moveMonth(1)} style={styles.monthButton}>
+            <Pressable accessibilityRole="button" onPress={() => moveMonth(1)} style={styles.monthButton}>
               <Ionicons
                 name="chevron-forward"
                 size={20}
@@ -255,7 +256,7 @@ export default function MoneyCalendarScreen({ navigation }) {
             ["goal", "Goals"],
             ["split", "Shared"],
           ].map(([id, label]) => (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={id}
               onPress={() => setFilter(id)}
               style={[styles.filter, filter === id && styles.filterActive]}
@@ -371,15 +372,15 @@ export default function MoneyCalendarScreen({ navigation }) {
 
 function CalendarGrid({ month, selected, onSelect, events }) {
   const firstWeekday = new Date(
-    month.getFullYear(),
-    month.getMonth(),
-    1
-  ).getDay();
+    Date.UTC(month.getUTCFullYear(),
+    month.getUTCMonth(),
+    1)
+  ).getUTCDay();
   const days = new Date(
-    month.getFullYear(),
-    month.getMonth() + 1,
-    0
-  ).getDate();
+    Date.UTC(month.getUTCFullYear(),
+    month.getUTCMonth() + 1,
+    0)
+  ).getUTCDate();
   const cells = [
     ...Array.from({ length: firstWeekday }, () => null),
     ...Array.from({ length: days }, (_, index) => index + 1),
@@ -391,13 +392,13 @@ function CalendarGrid({ month, selected, onSelect, events }) {
     <View style={styles.grid}>
       {cells.map((day, index) => {
         if (!day) return <View key={`blank-${index}`} style={styles.day} />;
-        const date = new Date(month.getFullYear(), month.getMonth(), day, 12);
+        const date = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), day, 12));
         const key = dateKey(date);
         const dayEvents = events.filter((event) => dateKey(event.date) === key);
         const active = key === selected;
         const today = key === todayKey;
         return (
-          <Pressable
+          <Pressable accessibilityRole="button"
             key={key}
             onPress={() => onSelect(key)}
             style={[styles.day, active && styles.dayActive]}

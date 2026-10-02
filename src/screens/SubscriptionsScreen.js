@@ -62,11 +62,11 @@ export default function SubscriptionsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>My subscriptions</Text>
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel="Add subscription"
           onPress={() => navigation.navigate("ManageSubscription")}
           style={styles.add}
         >
@@ -146,7 +146,7 @@ export default function SubscriptionsScreen({ navigation }) {
                 const service = serviceById(item.serviceId);
                 const days = daysUntil(item.renewalDate);
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     key={item.id}
                     onPress={() =>
                       navigation.navigate("ManageSubscription", {
@@ -182,7 +182,7 @@ export default function SubscriptionsScreen({ navigation }) {
             contentContainerStyle={styles.catalogContent}
           >
             {subscriptionCatalog.slice(0, -1).map((service) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={service.id}
                 onPress={() =>
                   navigation.navigate("ManageSubscription", {
@@ -327,7 +327,7 @@ function SubscriptionRow({
   const renewal = upcomingSubscriptions([item], 1)[0]?.renewalDate;
   return (
     <View style={[styles.rowWrap, !last && styles.rowDivider]}>
-      <Pressable
+      <Pressable accessibilityRole="button"
         onPress={onPress}
         onLongPress={onLongPress}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
@@ -350,7 +350,7 @@ function SubscriptionRow({
           </Text>
         </View>
       </Pressable>
-      <Pressable
+      <Pressable accessibilityRole="button"
         accessibilityLabel={
           item.status === "active" ? `Pause ${item.name}` : `Resume ${item.name}`
         }

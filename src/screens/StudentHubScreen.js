@@ -45,7 +45,7 @@ export default function StudentHubScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Student money hub</Text>
@@ -73,7 +73,7 @@ export default function StudentHubScreen({ navigation }) {
               <Text style={styles.scoreMax}>/100</Text>
             </View>
           </View>
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() => navigation.navigate("Coach")}
             style={styles.heroAction}
           >
@@ -103,7 +103,7 @@ export default function StudentHubScreen({ navigation }) {
           />
         </View>
 
-        <Text style={styles.sectionTitle}>Plan together</Text>
+        <Text style={styles.sectionTitle}>Plan your semester</Text>
         <HubFeature
           icon="calendar"
           title="Money calendar"
@@ -163,8 +163,9 @@ export default function StudentHubScreen({ navigation }) {
             color={colors.primary}
           />
           <Text style={styles.noteText}>
-            Coach recommendations and shared-expense records are calculated and
-            stored locally. No bank account or contact access is required.
+            The coach uses local budgeting rules. Splits are personal debt records,
+            synced to your own account; other people cannot view or settle them.
+            No bank account or contact access is required.
           </Text>
         </View>
       </ScrollView>
@@ -188,7 +189,7 @@ function MiniStat({ label, value, icon, color }) {
 
 function HubFeature({ icon, title, subtitle, badge, color, onPress }) {
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.feature, pressed && styles.pressed]}
     >
@@ -211,7 +212,7 @@ function HubFeature({ icon, title, subtitle, badge, color, onPress }) {
 
 function FoundationRow({ icon, title, value, onPress }) {
   return (
-    <Pressable onPress={onPress} style={styles.foundationRow}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.foundationRow}>
       <View style={styles.foundationIcon}>
         <Ionicons name={icon} size={18} color={colors.primary} />
       </View>

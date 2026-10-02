@@ -1,10 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useContext, useState } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -18,48 +16,35 @@ import { SubscriptionsContext } from "../context/SubscriptionsContext";
 import { AuthContext } from "../context/AuthContext";
 import { colors, radius } from "../design";
 import { confirmAction, showMessage } from "../utils/dialogs";
+import { jsonExport, csvExport } from '../domain/exports';
+import { shareExportFile } from '../services/exportFile';
 
 export default function PrivacyScreen({ navigation }) {
   const { user, isDemo, deleteAccount } = useContext(AuthContext);
   const budget = useContext(BudgetContext);
-  const { subscriptions, resetSubscriptions } = useContext(SubscriptionsContext);
-  const { goals, resetGoals } = useContext(GoalsContext);
-  const { splits, resetSplits } = useContext(SplitsContext);
+  const { subscriptions, resetSubscriptions, syncStatus: subscriptionStatus } = useContext(SubscriptionsContext);
+  const { goals, resetGoals, syncStatus: goalStatus } = useContext(GoalsContext);
+  const { splits, resetSplits, syncStatus: splitStatus } = useContext(SplitsContext);
+  const canExport = [budget.syncStatus, subscriptionStatus, goalStatus, splitStatus].every((status) => status === 'synced');
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const exportData = async () => {
+  const exportData = async (format = 'json') => {
+    if (!canExport) return;
     setExporting(true);
     try {
       const payload = {
-        exportedAt: new Date().toISOString(),
-        app: "Pocketwise",
         profile: budget.profile,
         settings: budget.settings,
         categoryBudgets: budget.categoryBudgets,
+        periodBudgets: budget.periodBudgets,
         transactions: budget.transactions,
         bills: budget.bills,
         subscriptions,
         goals,
         splits,
       };
-      const contents = JSON.stringify(payload, null, 2);
-      if (Platform.OS === "web" && globalThis.document) {
-        const blob = new Blob([contents], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const anchor = globalThis.document.createElement("a");
-        anchor.href = url;
-        anchor.download = `pocketwise-export-${new Date().toISOString().slice(0, 10)}.json`;
-        globalThis.document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(url);
-      } else {
-        await Share.share({
-          title: "Pocketwise data export",
-          message: contents,
-        });
-      }
+      await shareExportFile(format === 'json' ? jsonExport(payload) : csvExport(payload), format);
     } catch {
       showMessage(
         "Export unavailable",
@@ -110,7 +95,7 @@ export default function PrivacyScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Privacy & data</Text>
@@ -133,7 +118,7 @@ export default function PrivacyScreen({ navigation }) {
           <Text style={styles.heroText}>
             {isDemo
               ? "Demo information stays on this device and is never uploaded."
-              : "Your data syncs over encrypted connections to Supabase with per-user database policies, with a local device cache for offline access."}
+              : "Your records sync to Supabase over encrypted connections and are cached separately for each account. Cloud editing requires a connection and confirmed save. Offline editing is unavailable."}
           </Text>
         </View>
 
@@ -198,7 +183,7 @@ export default function PrivacyScreen({ navigation }) {
           <InfoRow
             icon="eye-off-outline"
             title="No tracking"
-            text="This version does not send analytics, financial entries, or advertising identifiers."
+            text="No analytics or advertising identifiers are sent. Signed-in financial records are sent to Supabase to save and synchronize your account."
           />
         </View>
 
@@ -218,13 +203,18 @@ export default function PrivacyScreen({ navigation }) {
             </Text>
           </View>
           <AppButton
-            title="Export"
+            title="Export JSON"
             variant="secondary"
-            onPress={exportData}
+            onPress={() => exportData('json')}
             loading={exporting}
+            disabled={!canExport}
             style={styles.exportButton}
           />
         </View>
+
+        <AppButton title="Export transactions CSV" variant="secondary" loading={exporting} disabled={!canExport} onPress={() => exportData('csv')} />
+        {!canExport ? <Text accessibilityRole="alert" style={styles.exportText}>Load every finance section successfully before exporting a complete backup.</Text> : null}
+        <Text style={styles.exportText}>JSON includes all records and histories. CSV contains actual transactions only. Import is unavailable until validation, preview, duplicate handling and atomic commit are implemented.</Text>
 
         <Text style={styles.sectionTitle}>Danger zone</Text>
         <View style={styles.danger}>
@@ -243,7 +233,7 @@ export default function PrivacyScreen({ navigation }) {
               </Text>
             </View>
           </View>
-          <Pressable
+          <Pressable accessibilityRole="button"
             disabled={deleting}
             onPress={isDemo ? confirmErase : confirmAccountDeletion}
             style={[styles.eraseButton, deleting && styles.eraseButtonDisabled]}

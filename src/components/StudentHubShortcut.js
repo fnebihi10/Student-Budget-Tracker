@@ -5,7 +5,7 @@ import { colors, radius } from "../design";
 
 export default function StudentHubShortcut({ navigation }) {
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       onPress={() => navigation.navigate("StudentHub")}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >

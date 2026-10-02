@@ -7,7 +7,7 @@ export default function SectionHeader({ title, action, onAction }) {
     <View style={styles.row}>
       <Text style={styles.title}>{title}</Text>
       {action ? (
-        <Pressable onPress={onAction} hitSlop={10}>
+        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={10}>
           <Text style={styles.action}>{action}</Text>
         </Pressable>
       ) : null}

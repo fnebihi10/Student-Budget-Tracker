@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useContext, useMemo, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -51,13 +52,13 @@ export default function ProfileScreen({ navigation }) {
     [subscriptions]
   );
 
-  const saveProfile = () => {
-    updateProfile({ name: name.trim(), school: school.trim() });
-    updateSettings({
+  const saveProfile = async () => {
+    if (!await updateProfile({ name: name.trim(), school: school.trim() })) return;
+    const saved = await updateSettings({
       monthlyBudget:
         Number(budget.replace(",", ".")) || settings.monthlyBudget,
     });
-    setShowProfile(false);
+    if (saved) setShowProfile(false);
   };
 
   const performLogout = async () => {
@@ -100,7 +101,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.eyebrow}>YOUR POCKETWISE</Text>
             <Text style={styles.title}>Profile & tools</Text>
           </View>
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() => setShowProfile(true)}
             style={styles.headerEdit}
           >
@@ -243,12 +244,15 @@ export default function ProfileScreen({ navigation }) {
             </View>
             <View style={styles.settingCopy}>
               <Text style={styles.settingTitle}>Currency</Text>
-              <Text style={styles.settingSubtitle}>Used for every amount</Text>
+              <Text style={styles.settingSubtitle}>One account currency; locked while records exist</Text>
             </View>
             <View style={styles.currencyRow}>
               {currencies.map((currency) => (
                 <Pressable
                   key={currency}
+                  disabled={currency !== settings.currency && Boolean(transactions.length || bills.length || subscriptions.length || goals.length || splits.length)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: settings.currency === currency, disabled: currency !== settings.currency && Boolean(transactions.length || bills.length || subscriptions.length || goals.length || splits.length) }}
                   onPress={() => updateSettings({ currency })}
                   style={[
                     styles.currency,
@@ -278,13 +282,14 @@ export default function ProfileScreen({ navigation }) {
               />
             </View>
             <View style={styles.settingCopy}>
-              <Text style={styles.settingTitle}>Budget reminders</Text>
+              <Text style={styles.settingTitle}>Reminders unavailable</Text>
               <Text style={styles.settingSubtitle}>
-                Preference saved for future check-ins
+                Notifications are not scheduled in this version
               </Text>
             </View>
             <View style={styles.switchWrap}>
               <Switch
+                disabled
                 value={settings.notifications}
                 onValueChange={(notifications) =>
                   updateSettings({ notifications })
@@ -323,7 +328,7 @@ export default function ProfileScreen({ navigation }) {
           />
         </View>
 
-        <Pressable
+        <Pressable accessibilityRole="button"
           disabled={isSigningOut}
           onPress={confirmLogout}
           style={[styles.logout, isSigningOut && styles.logoutDisabled]}
@@ -355,8 +360,8 @@ export default function ProfileScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowProfile(false)}
       >
-        <View style={styles.modalShade}>
-          <Pressable
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalShade}>
+          <Pressable accessibilityRole="button"
             style={StyleSheet.absoluteFill}
             onPress={() => setShowProfile(false)}
           />
@@ -367,7 +372,7 @@ export default function ProfileScreen({ navigation }) {
               Keep your plan personal and realistic.
             </Text>
             <Text style={styles.inputLabel}>First name</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Name"
               value={name}
               onChangeText={setName}
               placeholder="Your name"
@@ -375,7 +380,7 @@ export default function ProfileScreen({ navigation }) {
               style={styles.input}
             />
             <Text style={styles.inputLabel}>School</Text>
-            <TextInput
+            <TextInput accessibilityLabel="School"
               value={school}
               onChangeText={setSchool}
               placeholder="Optional"
@@ -383,7 +388,7 @@ export default function ProfileScreen({ navigation }) {
               style={styles.input}
             />
             <Text style={styles.inputLabel}>Monthly plan</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Monthly plan"
               value={budget}
               onChangeText={(value) =>
                 setBudget(value.replace(/[^0-9.,]/g, ""))
@@ -398,8 +403,9 @@ export default function ProfileScreen({ navigation }) {
               disabled={!name.trim() || !Number(budget.replace(",", "."))}
               style={styles.save}
             />
+            <AppButton title="Cancel" variant="ghost" onPress={() => setShowProfile(false)} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -421,7 +427,7 @@ function Snapshot({ icon, label, value, color }) {
 
 function ToolCard({ icon, title, subtitle, color, onPress }) {
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
         styles.toolCard,
@@ -442,7 +448,7 @@ function ToolCard({ icon, title, subtitle, color, onPress }) {
 
 function SettingRow({ icon, title, subtitle, onPress }) {
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [

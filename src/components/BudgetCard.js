@@ -7,12 +7,12 @@ import { formatMoney } from "../utils/formatters";
 
 export default function BudgetCard({ categoryId, spent, limit, currency, onPress }) {
   const category = categoryById(categoryId);
-  const ratio = limit > 0 ? spent / limit : 0;
+  const ratio = limit > 0 ? spent / limit : spent > 0 ? 2 : 0;
   const over = ratio > 1;
   const warning = ratio >= 0.8;
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.top}>
         <View style={[styles.icon, { backgroundColor: `${category.color}28` }]}>
           <Ionicons name={category.icon} size={20} color={category.color} />

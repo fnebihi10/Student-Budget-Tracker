@@ -23,7 +23,7 @@ export default function SubscriptionShortcut({ navigation, compact = false }) {
   );
 
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       accessibilityLabel="Open personal subscriptions"
       onPress={() => navigation.navigate("Subscriptions")}
       style={({ pressed }) => [

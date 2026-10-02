@@ -1,7 +1,7 @@
 export const colors = {
   ink: "#17211B",
-  muted: "#708078",
-  soft: "#9EAAA4",
+  muted: "#56675D",
+  soft: "#5D6E64",
   canvas: "#F5F7F3",
   surface: "#FFFFFF",
   line: "#E5EBE6",
@@ -13,5 +13,5 @@ export const colors = {
   coral: "#F38B78",
   blue: "#7AA7F7",
   lavender: "#B9A3F7",
-  red: "#D75A55",
+  red: "#B83C39",
 };

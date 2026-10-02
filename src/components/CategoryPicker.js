@@ -13,7 +13,9 @@ export default function CategoryPicker({ categories, value, onChange }) {
       {categories.map((category) => {
         const selected = category.id === value;
         return (
-          <Pressable
+          <Pressable accessibilityRole="button"
+            accessibilityLabel={category.label}
+            accessibilityState={{ selected }}
             key={category.id}
             onPress={() => onChange(category.id)}
             style={[styles.item, selected && styles.selected]}

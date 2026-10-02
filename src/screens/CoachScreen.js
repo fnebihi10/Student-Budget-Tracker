@@ -33,7 +33,7 @@ export default function CoachScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>Smart money coach</Text>
@@ -45,18 +45,17 @@ export default function CoachScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.scoreCard}>
-          <ScoreRing score={health.score} />
+          {health.insufficientData ? <Ionicons name="information-circle-outline" size={48} color={colors.primary} /> : <ScoreRing score={health.score} />}
           <View style={styles.scoreCopy}>
             <Text style={styles.scoreEyebrow}>YOUR MONEY HEALTH</Text>
             <Text style={styles.scoreTitle}>{health.grade}</Text>
             <Text style={styles.scoreText}>
-              This transparent score uses only your Pocketwise plan, cash flow,
-              goals, commitments, and tracking habits.
+              {health.insufficientData ? 'Record at least three transactions this month before viewing a score.' : 'This rules-based score uses your recorded monthly net, plan, goals, commitments and tracking habits. It has no bank balance or AI model.'}
             </Text>
           </View>
         </View>
 
-        <View style={styles.breakdownCard}>
+        {!health.insufficientData ? <View style={styles.breakdownCard}>
           <Text style={styles.sectionTitle}>How the score is built</Text>
           {health.breakdown.map((item) => {
             const ratio = (item.score / item.max) * 100;
@@ -100,9 +99,10 @@ export default function CoachScreen({ navigation }) {
           </View>
         </View>
 
+        : null}
         <Text style={styles.sectionTitleOutside}>Recommended next moves</Text>
         {actions.map((action) => (
-          <Pressable
+          <Pressable accessibilityRole="button"
             key={action.id}
             onPress={action.onPress}
             style={({ pressed }) => [
@@ -158,8 +158,8 @@ export default function CoachScreen({ navigation }) {
             </View>
           </View>
           <Text style={styles.challengeText}>
-            Before three non-essential purchases, check your safe-to-spend
-            balance, wait ten minutes, and decide again. Record only the purchases
+            Before three non-essential purchases, check your budget
+            estimate, wait ten minutes, and decide again. Record only the purchases
             you still value.
           </Text>
           <View style={styles.challengeSteps}>

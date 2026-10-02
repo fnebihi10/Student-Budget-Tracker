@@ -3,15 +3,16 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radius } from "../design";
 import { monthLabel } from "../utils/formatters";
+import { monthStart } from '../domain/calendar';
 
 export default function MonthSwitcher({ value, onChange, allowFuture = false }) {
   const current = new Date();
   const isCurrentMonth =
-    value.getFullYear() === current.getFullYear() &&
-    value.getMonth() === current.getMonth();
+    value.getUTCFullYear() === current.getUTCFullYear() &&
+    value.getUTCMonth() === current.getUTCMonth();
 
   const move = (offset) => {
-    const next = new Date(value.getFullYear(), value.getMonth() + offset, 1, 12);
+    const next = monthStart(value, offset);
     onChange(next);
   };
 
@@ -25,7 +26,7 @@ export default function MonthSwitcher({ value, onChange, allowFuture = false }) 
       <View style={styles.copy}>
         <Text style={styles.label}>{monthLabel(value)}</Text>
         {!isCurrentMonth ? (
-          <Pressable onPress={() => onChange(new Date())} hitSlop={8}>
+          <Pressable accessibilityRole="button" onPress={() => onChange(new Date())} hitSlop={8}>
             <Text style={styles.current}>Return to current month</Text>
           </Pressable>
         ) : (

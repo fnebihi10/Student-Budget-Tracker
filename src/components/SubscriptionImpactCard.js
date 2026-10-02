@@ -22,7 +22,7 @@ export default function SubscriptionImpactCard({ navigation }) {
     : 0;
 
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       onPress={() => navigation.navigate("Subscriptions")}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >

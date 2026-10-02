@@ -21,18 +21,24 @@ import { categoryById } from "../data/categories";
 import { colors, radius, type } from "../design";
 import { categorySpend } from "../utils/calculations";
 import { formatMoney } from "../utils/formatters";
-import { isBillPaidForMonth } from "../utils/dates";
+import { isBillPaidForMonth, monthKey } from "../utils/dates";
+import MonthSwitcher from '../components/MonthSwitcher';
+import { validMoney } from '../domain/finance';
 
 export default function BudgetsScreen({ navigation }) {
   const {
     transactions,
-    categoryBudgets,
+    categoryBudgets: currentCategories,
+    defaultCategoryBudgets,
+    periodBudgets,
     setCategoryBudget,
     bills,
     toggleBill,
     settings,
   } = useContext(BudgetContext);
-  const spend = useMemo(() => categorySpend(transactions), [transactions]);
+  const [month, setMonth] = useState(new Date());
+  const categoryBudgets = periodBudgets[monthKey(month)]?.categoryBudgets || defaultCategoryBudgets || currentCategories;
+  const spend = useMemo(() => categorySpend(transactions, month), [transactions, month]);
   const [editing, setEditing] = useState(null);
   const [limit, setLimit] = useState("");
   const totalPlanned = Object.values(categoryBudgets).reduce((sum, value) => sum + value, 0);
@@ -42,8 +48,8 @@ export default function BudgetsScreen({ navigation }) {
     setLimit(String(categoryBudgets[category] || ""));
   };
 
-  const saveLimit = () => {
-    setCategoryBudget(editing, limit);
+  const saveLimit = async () => {
+    if (!await setCategoryBudget(editing, limit, monthKey(month))) return;
     setEditing(null);
   };
 
@@ -55,11 +61,12 @@ export default function BudgetsScreen({ navigation }) {
             <Text style={styles.eyebrow}>YOUR PLAN</Text>
             <Text style={styles.title}>Budgets & bills</Text>
           </View>
-          <Pressable onPress={() => navigation.navigate("AddBill")} style={styles.add}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Add bill" onPress={() => navigation.navigate("AddBill")} style={styles.add}>
             <Ionicons name="add" size={24} color={colors.surface} />
           </Pressable>
         </View>
 
+        <MonthSwitcher value={month} onChange={setMonth} allowFuture />
         <View style={styles.planCard}>
           <View style={styles.planIcon}>
             <Ionicons name="map-outline" size={22} color={colors.primaryDark} />
@@ -99,10 +106,10 @@ export default function BudgetsScreen({ navigation }) {
                 .sort((a, b) => a.dueDay - b.dueDay)
                 .map((bill, index) => {
                   const category = categoryById(bill.category);
-                  const isPaid = isBillPaidForMonth(bill);
+                  const isPaid = isBillPaidForMonth(bill, month);
                   return (
                     <View key={bill.id}>
-                      <Pressable onPress={() => toggleBill(bill.id)} style={styles.bill}>
+                      <Pressable accessibilityRole="checkbox" accessibilityLabel={`${bill.title} paid for ${monthKey(month)}`} accessibilityState={{ checked: isPaid }} onPress={() => toggleBill(bill.id, monthKey(month))} style={styles.bill}>
                         <View style={[styles.billIcon, { backgroundColor: `${category.color}25` }]}>
                           <Ionicons name={category.icon} size={20} color={category.color} />
                         </View>
@@ -119,6 +126,7 @@ export default function BudgetsScreen({ navigation }) {
                           color={isPaid ? colors.primary : colors.soft}
                         />
                       </Pressable>
+                      <AppButton title={`Edit ${bill.title}`} variant="ghost" onPress={() => navigation.navigate('AddBill', { billId: bill.id })} />
                       {index < bills.length - 1 ? <View style={styles.divider} /> : null}
                     </View>
                   );
@@ -138,14 +146,14 @@ export default function BudgetsScreen({ navigation }) {
 
       <Modal visible={Boolean(editing)} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalShade}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditing(null)} />
+          <Pressable accessibilityRole="button" style={StyleSheet.absoluteFill} onPress={() => setEditing(null)} />
           <View style={styles.modalCard}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>
               {editing ? categoryById(editing).label : ""} limit
             </Text>
-            <Text style={styles.modalText}>Set a comfortable maximum for this month.</Text>
-            <TextInput
+            <Text style={styles.modalText}>This limit applies only to the selected month. Unconfigured months use your default plan.</Text>
+            <TextInput accessibilityLabel="Category limit"
               value={limit}
               onChangeText={(value) => setLimit(value.replace(/[^0-9.,]/g, ""))}
               keyboardType="decimal-pad"
@@ -154,7 +162,8 @@ export default function BudgetsScreen({ navigation }) {
               placeholderTextColor={colors.soft}
               style={styles.limitInput}
             />
-            <AppButton title="Save limit" onPress={saveLimit} disabled={!Number(limit.replace(",", "."))} />
+            <AppButton title="Save limit" onPress={saveLimit} disabled={!validMoney(limit, true)} />
+            <AppButton title="Cancel" variant="ghost" onPress={() => setEditing(null)} />
           </View>
         </KeyboardAvoidingView>
       </Modal>
