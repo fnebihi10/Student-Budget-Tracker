@@ -1,18 +1,19 @@
-# Supabase setup
+﻿# Supabase setup
 
-The production schema is versioned in the migrations directory.
+Migrations are the versioned schema, not sample data. Never place secret keys,
+database passwords or a service_role key in this repository or client config.
 
-## Apply the migrations
+Read [the forward migration and recovery guide](../docs/MIGRATIONS.md) before
+applying unapplied files in filename order. Back up and rehearse on a disposable
+Supabase project first. The upgrade requires revision-aware clients and includes
+owner protections, precision checks, goal reconciliation and deletion tombstones.
+No production database was modified as part of the workspace implementation.
 
-Until the repository is linked to the Supabase CLI, open the project's SQL
-Editor and run every SQL file in `migrations` in filename order. If the initial
-schema is already live, apply only the newer files that have not been run yet.
+Use Supabase migration tooling to track versions. If using SQL Editor, maintain
+an explicit applied-version record; do not blindly rerun initial schema files.
+Account deletion is authenticated and self-only, with foreign-key cascades.
 
-The migration creates the application tables, constraints, indexes, explicit
-Data API grants, per-user Row Level Security policies, and the signup trigger
-that initializes a profile and settings row. The account-deletion migration
-adds the authenticated, self-only deletion function used by the Privacy screen;
-its foreign-key cascades remove all records owned by that account.
-
-Never put the database password, secret API key, or service_role key in this
-repository or in an EXPO_PUBLIC environment variable.
+`npm run test:database` exercises all migrations with actual SQL in disposable
+PGlite and modeled anonymous/two-user roles. This is not a live Supabase Auth or
+PostgREST test. Complete those checks before deployment; see
+[verification](../docs/VERIFICATION.md).

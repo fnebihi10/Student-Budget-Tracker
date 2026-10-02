@@ -1,111 +1,85 @@
-# Pocketwise
+﻿# Pocketwise
 
-Pocketwise is a cross-platform personal finance app designed for students. It
-combines day-to-day expense tracking with budgets, recurring costs, savings
-goals, shared expenses, and practical cash-flow guidance in one responsive
-Expo application.
+A calm green student-finance app for web, Android and iOS, built with Expo SDK 57,
+React Native, React Navigation and Supabase. This upgrade preserves existing
+cloud records and quarantines legacy device caches whose owner cannot be proven.
 
-The project runs on iOS, Android, and the web from a shared React Native
-codebase. Authenticated data is synchronized with Supabase, while local storage
-keeps sessions and demo data available on the device.
+## Setup
 
-## Highlights
-
-- Expense and income tracking with editing, notes, categories, and monthly history
-- Category budgets with live progress and over-budget indicators
-- Recurring bills and subscriptions with renewals, trials, and annual cost insights
-- Savings goals with templates, deadlines, recommended pace, and contribution history
-- Shared-expense tracking and settlement status
-- Money calendar, reports, financial-health guidance, and safe-to-spend estimates
-- Responsive layouts for mobile and desktop web
-- Guided onboarding, authenticated accounts, demo mode, JSON export, and account deletion
-
-## Technical overview
-
-| Area | Implementation |
-| --- | --- |
-| Client | Expo SDK 57, React 19, React Native 0.86 |
-| Navigation | React Navigation 7 |
-| Backend | Supabase Auth and PostgreSQL |
-| Security | Row Level Security, per-user policies, restricted account-deletion RPC |
-| Persistence | Supabase cloud sync and AsyncStorage local cache/demo data |
-| Quality | ESLint, Jest, Expo Doctor, and production exports for web, iOS, and Android |
-
-The application is organized by responsibility: reusable UI components live in
-`src/components`, feature screens in `src/screens`, state and synchronization in
-`src/context`, pure calculations in `src/utils`, and Supabase access in
-`src/services` and `src/lib`.
-
-## Local setup
-
-Node.js 22.13 or newer is required. The included `.nvmrc` targets Node 22.21.0.
+Use Node 22.21 (`.nvmrc`) and the committed lockfile:
 
 ```powershell
-npm install
-Copy-Item .env.example .env.local
+npm ci
 npm start
 ```
 
-Set these public client values in `.env.local` before using authenticated cloud
-features:
+Demo mode works without Supabase configuration. For authenticated use, copy
+`.env.example` to `.env.local` and set `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put service-role credentials or
+DB passwords in a client environment variable. Apply the forward migrations
+before authenticated writes; see [migration and recovery guide](docs/MIGRATIONS.md).
 
-```dotenv
-EXPO_PUBLIC_SUPABASE_URL=your-project-url
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-```
+Configure Supabase Auth site URL and redirect allowlist for the deployed web
+origin and `pocketwise://auth` (including recovery query URLs used by the app).
+The client supports PKCE confirmation/reset callbacks and password recovery.
+Use an installed development/native build with the pocketwise scheme to verify
+native links; Expo Go is not evidence that production deep links work. Configure
+and test email delivery separately. No production email/device verification was
+performed in this workspace.
 
-Never place a database password or Supabase `service_role` key in the client or
-repository.
+## Actual feature status
 
-### Run on a device
+- Transaction CRUD, monthly reports, period category budgets and zero-limit alerts.
+- Bill edit/delete and monthly paid occurrence history; subscription calendar
+  projections include every weekly renewal.
+- Savings goals with opening balances and contribution/withdrawal reconciliation.
+- Personal debt tracking, a rules-based coach, and explicitly labeled budget
+  estimates with commitment assumptions. No bank-balance or collaboration claim.
+- Confirmed cloud writes, retryable failed loads, per-account caches, demo isolation,
+  revision conflicts and database deletion tombstones.
+- Versioned JSON backup and transaction CSV export; native exports share files.
+- Account deletion, recovery UI, error boundary and bounded redacted diagnostics.
 
-Install Expo Go, sign in to the same Expo account used by the CLI, and scan the
-QR code shown by `npm start`. The phone and computer should normally be on the
-same Wi-Fi network. If local discovery is blocked, use:
+Authenticated offline edits are disabled; load/reload must succeed before editing.
+Import and reminders are unavailable. Purchases are disabled until real billing
+and trusted server entitlement verification exist. This is not yet a verified
+production release: [verification and remaining blockers](docs/VERIFICATION.md).
+
+## Checks
 
 ```powershell
-npm run start:tunnel
-```
-
-## Database setup
-
-The SQL files in `supabase/migrations` are the versioned production schema, not
-sample data. They create the tables, constraints, indexes, signup trigger, Data
-API grants, Row Level Security policies, and the self-service account-deletion
-function used by the app.
-
-Apply migrations in filename order through the Supabase CLI or SQL Editor. A
-database that already has the initial schema only needs migrations that have not
-previously been applied. More detail is available in
-[`supabase/README.md`](supabase/README.md).
-
-## Quality checks
-
-```powershell
-npm run lint
+npm run lint -- --max-warnings 0
+npm run typecheck
 npm test
+npm run test:database
 npx expo-doctor
 npm run export
+npm run export:demo
+npx playwright install chromium
+npm run test:e2e
 ```
 
-Run the complete local verification pipeline with:
+`npm run check` runs lint, types, Jest, disposable database checks and configured
+three-platform exports. Browser tests separately use `dist-demo` and a local
+loopback server; on Windows they use installed Edge if available. CI also runs
+Doctor, browser journeys and timezone regression tests. Exporting bundles does
+not verify native runtime behavior or store distribution.
 
-```powershell
-npm run check
-```
+## Documentation
 
-The utility test suite covers date handling, calculations, coaching logic, and
-subscription projections. Production export validates all three supported
-targets: web, iOS, and Android.
+- [Baseline audit and acceptance criteria](docs/AUDIT.md)
+- [Architecture and concurrency policy](docs/ARCHITECTURE.md)
+- [Financial definitions and rounding/date conventions](docs/FINANCIAL_ASSUMPTIONS.md)
+- [Forward migrations and recovery](docs/MIGRATIONS.md)
+- [Checks, phase report, performance and blockers](docs/VERIFICATION.md)
 
-## Privacy and current scope
+Domain and service contracts are migrating incrementally to strict TypeScript;
+JavaScript presentation/context boundaries remain. The Expo stack and vendored
+URI decoder are preserved. Authenticated records synchronize with Supabase;
+there are no analytics or advertising integrations.
 
-Authenticated records are isolated by user ID through PostgreSQL Row Level
-Security. Users can export their data and permanently delete their account.
-There are no analytics or advertising integrations.
+## Browser examples
 
-The Pro paywall is an interface preview only; purchases are intentionally
-disabled until store products, receipt validation, entitlement handling,
-restore purchases, legal documents, and production email delivery are
-configured. The UI never reports a successful purchase without store-backed
-verification.
+[390px goals form](docs/screenshots/goal-390.png),
+[360px large amount form](docs/screenshots/transaction-360.png),
+[1440px dashboard](docs/screenshots/dashboard-1440.png).

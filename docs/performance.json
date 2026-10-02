@@ -1,0 +1,30 @@
+{
+  "recordedAt": "2026-10-02T20:37:51.597Z",
+  "node": "v22.21.0",
+  "platform": "win32 10.0.26300",
+  "cpu": "AMD Ryzen 5 5600X 6-Core Processor             ",
+  "environment": "Node CPU benchmark, mocked network/storage, 5 warmups + 25 samples. These are not phone timings.",
+  "records": 10000,
+  "totals": {
+    "medianMs": 6.837,
+    "p95Ms": 7.139
+  },
+  "legacyWholeCollectionSerialization": {
+    "medianMs": 3.895,
+    "p95Ms": 4.466
+  },
+  "changedRecordCache": {
+    "medianMs": 0.9,
+    "p95Ms": 3.732
+  },
+  "changedRecordCloud": {
+    "medianMs": 1.085,
+    "p95Ms": 3.597
+  },
+  "singleEdit": {
+    "serializedRecords": 1,
+    "serializedBytes": 134,
+    "cloudRequests": 1,
+    "legacySerializedBytes": 1368891
+  }
+}

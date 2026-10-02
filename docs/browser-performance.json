@@ -1,0 +1,9 @@
+{
+  "records": 10000,
+  "homeMs": 81,
+  "activityMs": 58,
+  "renderedRows": 10,
+  "cloudRequests": 0,
+  "browser": "154.0.4258.53",
+  "environment": "Headless Edge/Chromium, local production web export, synthetic demo data. No native device or real network timings."
+}
