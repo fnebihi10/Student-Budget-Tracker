@@ -1,28 +1,23 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useConfirmedStore } from './useConfirmedStore';
+import { contribute, openingBalance, positiveMoney, parseMinor, assertText, assertDate } from '../domain/finance';
 import React, {
   createContext,
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
-  useState,
 } from "react";
-import { AuthContext } from "./AuthContext";
 import {
-  deleteRow,
   fetchRows,
   goalFromRow,
   goalToRow,
   newId,
-  upsertRows,
+  persistCollection,
 } from "../services/cloudData";
 
-const STORAGE_KEY = "@pocketwise/savings-goals/v1";
 
 const futureDate = (days) => {
   const date = new Date();
-  date.setDate(date.getDate() + days);
-  date.setHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + days);
+  date.setUTCHours(12, 0, 0, 0);
   return date.toISOString();
 };
 
@@ -64,83 +59,24 @@ const demoGoals = [
 export const GoalsContext = createContext(null);
 
 export function GoalsProvider({ children }) {
-  const { user } = React.useContext(AuthContext);
-  const [goals, setGoals] = useState([]);
-  const [isLoadingGoals, setIsLoadingGoals] = useState(true);
-  const [goalsStorageError, setGoalsStorageError] = useState("");
-  const [goalsCloudReady, setGoalsCloudReady] = useState(false);
-  const cloudUserRef = useRef(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((stored) => {
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (!Array.isArray(parsed)) throw new Error("Invalid goals data");
-          setGoals(parsed);
-        }
-      })
-      .catch(() => setGoalsStorageError("Savings goals could not be loaded."))
-      .finally(() => setIsLoadingGoals(false));
-  }, []);
-
-  useEffect(() => {
-    if (isLoadingGoals) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(goals)).catch(() =>
-      setGoalsStorageError("Savings goals could not be saved.")
-    );
-  }, [goals, isLoadingGoals]);
-
-  useEffect(() => {
-    if (!user) {
-      const shouldClear = Boolean(cloudUserRef.current);
-      cloudUserRef.current = null;
-      if (shouldClear) {
-        queueMicrotask(() => {
-          setGoals([]);
-          setGoalsCloudReady(false);
-        });
-      }
-      return;
-    }
-    if (isLoadingGoals || cloudUserRef.current === user.id) return;
-    cloudUserRef.current = user.id;
-    setIsLoadingGoals(true);
-    fetchRows("goals", user.id, "created_at")
-      .then((rows) => {
-        setGoals(rows.map(goalFromRow));
-        setGoalsCloudReady(true);
-      })
-      .catch(() => {
-        setGoalsCloudReady(false);
-        setGoalsStorageError("Savings goals could not be loaded from the cloud.");
-      })
-      .finally(() => setIsLoadingGoals(false));
-  }, [user, isLoadingGoals]);
-
-  useEffect(() => {
-    if (
-      !user ||
-      cloudUserRef.current !== user.id ||
-      !goalsCloudReady ||
-      isLoadingGoals
-    ) return;
-    const timer = setTimeout(() => {
-      upsertRows("goals", user.id, goals.map(goalToRow)).catch(() =>
-        setGoalsStorageError("Savings goals could not be synced.")
-      );
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [user, goals, goalsCloudReady, isLoadingGoals]);
+  const store = useConfirmedStore('goals', [], demoGoals,
+    async (user) => (await fetchRows('goals', user.id)).map(goalFromRow),
+    (userId, before, after) => persistCollection('goals', userId, before, after, goalToRow));
+  const goals = store.data;
+  const isLoadingGoals = store.status === 'loading' && !store.initialized;
+  const goalsStorageError = store.error;
+  const setGoals = store.mutate;
 
   const saveGoal = useCallback((goal) => {
-    const target = Number(goal.target);
-    const saved = Number(goal.saved) || 0;
-    if (!goal.name?.trim() || !Number.isFinite(target) || target <= 0) return false;
-    setGoals((current) => {
+    return setGoals((current) => {
+      const target = positiveMoney(goal.target);
+      const saved = parseMinor(goal.saved ?? 0) / 100;
+      assertText(goal.name, 80, 'Goal name');
+      if (goal.deadline) assertDate(goal.deadline);
+      if ((goal.notes || '').length > 500) throw new Error('Notes must be at most 500 characters.');
       if (goal.id) {
         return current.map((item) =>
-          item.id === goal.id ? { ...item, ...goal } : item
+          item.id === goal.id ? { ...item, ...goal, target, saved: item.saved, startingBalance: openingBalance(item), activity: item.activity } : item
         );
       }
       return [
@@ -148,72 +84,55 @@ export function GoalsProvider({ children }) {
           ...goal,
           id: newId(),
           target,
-          saved: Math.max(0, saved),
+          saved,
+          startingBalance: saved,
           createdAt: new Date().toISOString(),
           activity: [],
         },
         ...current,
       ];
     });
-    return true;
-  }, []);
+  }, [setGoals]);
 
   const addGoalActivity = useCallback((id, amount, note = "") => {
-    const numeric = Number(amount);
-    if (!Number.isFinite(numeric) || numeric === 0) return false;
-    setGoals((current) =>
+    return setGoals((current) =>
       current.map((goal) => {
         if (goal.id !== id) return goal;
-        const nextSaved = Math.max(0, (Number(goal.saved) || 0) + numeric);
-        return {
-          ...goal,
-          saved: nextSaved,
-          activity: [
-            {
+        return contribute(goal, {
               id: newId(),
-              amount: numeric,
+              amount: parseMinor(amount, true) / 100,
               note: note.trim(),
               date: new Date().toISOString(),
-            },
-            ...(goal.activity || []),
-          ],
-        };
+        });
       })
     );
-    return true;
-  }, []);
+  }, [setGoals]);
 
-  const deleteGoal = useCallback((id) => {
-    setGoals((current) => current.filter((goal) => goal.id !== id));
-    if (user) {
-      deleteRow("goals", user.id, id).catch(() =>
-        setGoalsStorageError("The goal could not be deleted from the cloud.")
-      );
-    }
-  }, [user]);
+  const deleteGoal = useCallback((id) =>
+    setGoals((current) => current.filter((item) => item.id !== id)), [setGoals]);
 
-  const loadDemoGoals = useCallback(() => setGoals(demoGoals), []);
-  const resetGoals = useCallback(() => setGoals([]), []);
+  const resetGoals = useCallback(() => setGoals(() => []), [setGoals]);
 
   const value = useMemo(
     () => ({
+      syncStatus: store.status,
+      retrySync: store.retry,
       goals,
       isLoadingGoals,
       goalsStorageError,
       saveGoal,
       addGoalActivity,
       deleteGoal,
-      loadDemoGoals,
       resetGoals,
     }),
     [
+      store.status, store.retry,
       goals,
       isLoadingGoals,
       goalsStorageError,
       saveGoal,
       addGoalActivity,
       deleteGoal,
-      loadDemoGoals,
       resetGoals,
     ]
   );

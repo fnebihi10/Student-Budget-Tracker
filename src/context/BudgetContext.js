@@ -1,22 +1,17 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useConfirmedStore } from './useConfirmedStore';
+import { validMoney, positiveMoney, parseMinor, recordBillPayment, clearBillPayment } from '../domain/finance';
 import React, {
   createContext,
   useCallback,
-  useContext,
-  useEffect,
   useMemo,
-  useRef,
-  useState,
 } from "react";
 import { totalCategoryBudget } from "../utils/calculations";
 import { monthKey } from "../utils/dates";
-import { AuthContext } from "./AuthContext";
 import {
   billFromRow,
-  deleteRow,
   fetchBudgetData,
   newId,
-  syncBudgetData,
+  persistBudgetChanges,
   transactionFromRow,
 } from "../services/cloudData";
 
@@ -31,10 +26,7 @@ const DEFAULT_CATEGORY_BUDGETS = {
   other: 30,
 };
 
-const positiveAmount = (value) => {
-  const amount = Number(String(value).replace(",", "."));
-  return Number.isFinite(amount) && amount > 0 ? amount : 0;
-};
+const positiveAmount = (value) => validMoney(value) ? positiveMoney(value) : 0;
 
 const roundAmount = (value) => Math.round(value * 100) / 100;
 
@@ -49,25 +41,11 @@ const normalizeCategoryBudgets = (categoryBudgets, monthlyBudget) => {
   return Object.fromEntries(scaled);
 };
 
-const normalizeBills = (bills = []) =>
-  Array.isArray(bills)
-    ? bills.map((bill) => {
-        const { paid, ...currentBill } = bill;
-        return {
-          ...currentBill,
-          amount: positiveAmount(bill.amount),
-          dueDay: Math.min(31, Math.max(1, Math.round(Number(bill.dueDay) || 1))),
-          paidMonth: bill.paidMonth || (paid ? monthKey() : null),
-        };
-      })
-    : [];
-
-const STORAGE_KEY = "@pocketwise/v1";
 
 const dateThisMonth = (day) => {
   const date = new Date();
-  date.setDate(Math.min(day, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()));
-  date.setHours(12, 0, 0, 0);
+  date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()));
+  date.setUTCHours(12, 0, 0, 0);
   return date.toISOString();
 };
 
@@ -89,6 +67,7 @@ const starterState = {
     ...DEFAULT_CATEGORY_BUDGETS,
   },
   transactions: [],
+  periodBudgets: {},
   bills: [],
   subscription: {
     plan: "free",
@@ -125,91 +104,28 @@ const demoState = {
 export const BudgetContext = createContext(null);
 
 export const BudgetProvider = ({ children }) => {
-  const {
-    user,
-    isAuthLoading,
-    pendingOnboarding,
-    clearPendingOnboarding,
-  } = useContext(AuthContext);
-  const [data, setData] = useState(starterState);
-  const [isLoading, setIsLoading] = useState(true);
-  const [storageError, setStorageError] = useState("");
-  const [cloudReady, setCloudReady] = useState(false);
-  const cloudUserRef = useRef(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((stored) => {
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const settings = { ...starterState.settings, ...(parsed.settings || {}) };
-          const monthlyBudget = positiveAmount(settings.monthlyBudget) || starterState.settings.monthlyBudget;
-          setData({
-            ...starterState,
-            ...parsed,
-            profile: { ...starterState.profile, ...parsed.profile },
-            settings: { ...settings, monthlyBudget },
-            categoryBudgets: normalizeCategoryBudgets(
-              { ...DEFAULT_CATEGORY_BUDGETS, ...(parsed.categoryBudgets || {}) },
-              monthlyBudget
-            ),
-            transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-            bills: normalizeBills(parsed.bills),
-            subscription: { ...starterState.subscription, ...parsed.subscription },
-          });
-        }
-      })
-      .catch(() => setStorageError("Your saved data could not be loaded."))
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (isLoading) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch(() =>
-      setStorageError("Changes could not be saved on this device.")
-    );
-  }, [data, isLoading]);
-
-  useEffect(() => {
-    if (!user) {
-      const shouldClear = Boolean(cloudUserRef.current);
-      cloudUserRef.current = null;
-      if (shouldClear) {
-        queueMicrotask(() => {
-          setData(starterState);
-          setCloudReady(false);
-        });
-      }
-      return;
-    }
-    if (isAuthLoading) return;
-    if (isLoading || cloudUserRef.current === user.id) return;
-    cloudUserRef.current = user.id;
-    setIsLoading(true);
-    fetchBudgetData(user)
-      .then((cloud) => {
+  const store = useConfirmedStore('budget', starterState, demoState,
+    async (user) => {
+      const cloud = await fetchBudgetData(user);
         const metadata = user.user_metadata || {};
-        const pending =
-          pendingOnboarding?.email === user.email?.toLowerCase()
-            ? pendingOnboarding
-            : null;
         const cloudSettings = cloud.settings || {};
         const monthlyBudget =
-          positiveAmount(pending?.monthlyBudget) ||
           positiveAmount(cloudSettings.monthly_budget) ||
           positiveAmount(metadata.monthly_budget) ||
           starterState.settings.monthlyBudget;
-        setData({
+        return {
           ...starterState,
           onboardingComplete: true,
           sessionActive: true,
           profile: {
-            name: pending?.name || cloud.profile?.name || metadata.name || "",
+            revision: cloud.profile?.revision || 0,
+            name: cloud.profile?.name || metadata.name || "",
             email: user.email || "",
             school:
-              pending?.school || cloud.profile?.school || metadata.school || "",
+              cloud.profile?.school || metadata.school || "",
           },
           settings: {
+            revision: cloudSettings.revision || 0,
             currency: cloudSettings.currency || "EUR",
             monthlyBudget,
             notifications: cloudSettings.notifications ?? true,
@@ -222,48 +138,21 @@ export const BudgetProvider = ({ children }) => {
             monthlyBudget
           ),
           transactions: cloud.transactions.map(transactionFromRow),
+          periodBudgets: cloudSettings.period_budgets || {},
           bills: cloud.bills.map(billFromRow),
           subscription: {
-            plan: cloudSettings.subscription_plan || "free",
-            status: cloudSettings.subscription_status || "inactive",
+            plan: "free",
+            status: "inactive",
           },
-        });
-        setCloudReady(true);
-        if (pending) clearPendingOnboarding();
-      })
-      .catch(() => {
-        setCloudReady(false);
-        setStorageError("Your cloud budget could not be loaded.");
-      })
-      .finally(() => setIsLoading(false));
-  }, [
-    user,
-    isAuthLoading,
-    pendingOnboarding,
-    clearPendingOnboarding,
-    isLoading,
-  ]);
-
-  useEffect(() => {
-    if (
-      !user ||
-      cloudUserRef.current !== user.id ||
-      !cloudReady ||
-      isLoading
-    ) return;
-    const timer = setTimeout(() => {
-      syncBudgetData(user.id, data).catch(() =>
-        setStorageError("Your latest changes could not be synced.")
-      );
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [user, data, cloudReady, isLoading]);
-
-  const update = useCallback((recipe) => {
-    setData((current) =>
-      typeof recipe === "function" ? recipe(current) : { ...current, ...recipe }
-    );
-  }, []);
+        };
+    }, persistBudgetChanges);
+  const data = store.data;
+  const isLoading = store.status === 'loading' && !store.initialized;
+  const storageError = store.error;
+  const mutate = store.mutate;
+  const update = useCallback((recipe) => mutate((current) =>
+    typeof recipe === 'function' ? recipe(current) : { ...current, ...recipe }
+  ), [mutate]);
 
   const addTransaction = useCallback(
     (transaction) => {
@@ -283,26 +172,14 @@ export const BudgetProvider = ({ children }) => {
         date: transactionDate.toISOString(),
       };
       if (!item.amount) return null;
-      update((current) => ({ ...current, transactions: [item, ...current.transactions] }));
-      return item;
+      return update((current) => ({ ...current, transactions: [item, ...current.transactions] }));
     },
     [update]
   );
 
-  const deleteTransaction = useCallback(
-    (id) => {
-      update((current) => ({
-        ...current,
-        transactions: current.transactions.filter((item) => item.id !== id),
-      }));
-      if (user) {
-        deleteRow("transactions", user.id, id).catch(() =>
-          setStorageError("The transaction could not be deleted from the cloud.")
-        );
-      }
-    },
-    [update, user]
-  );
+  const deleteTransaction = useCallback((id) => update((current) => ({
+    ...current, transactions: current.transactions.filter((item) => item.id !== id),
+  })), [update]);
 
   const updateTransaction = useCallback(
     (id, transaction) => {
@@ -318,7 +195,7 @@ export const BudgetProvider = ({ children }) => {
       ) {
         return false;
       }
-      update((current) => ({
+      return update((current) => ({
         ...current,
         transactions: current.transactions.map((item) =>
           item.id === id
@@ -334,24 +211,25 @@ export const BudgetProvider = ({ children }) => {
             : item
         ),
       }));
-      return true;
     },
     [update]
   );
 
   const setCategoryBudget = useCallback(
-    (category, amount) =>
+    (category, amount, period = monthKey()) =>
       update((current) => {
-        const requested = roundAmount(positiveAmount(amount));
+        const requested = parseMinor(amount) / 100;
+        const plan = current.periodBudgets[period] || { monthlyBudget: current.settings.monthlyBudget, categoryBudgets: current.categoryBudgets };
         const plannedElsewhere =
-          totalCategoryBudget(current.categoryBudgets) -
-          positiveAmount(current.categoryBudgets[category]);
-        const maximum = Math.max(0, positiveAmount(current.settings.monthlyBudget) - plannedElsewhere);
+          totalCategoryBudget(plan.categoryBudgets) -
+          positiveAmount(plan.categoryBudgets[category]);
+        const maximum = Math.max(0, positiveAmount(plan.monthlyBudget) - plannedElsewhere);
+        if (requested > roundAmount(maximum)) throw new Error('Category limits exceed this month’s plan.');
         return {
           ...current,
-          categoryBudgets: {
-            ...current.categoryBudgets,
-            [category]: Math.min(requested, roundAmount(maximum)),
+          periodBudgets: {
+            ...current.periodBudgets,
+            [period]: { ...plan, categoryBudgets: { ...plan.categoryBudgets, [category]: requested } },
           },
         };
       }),
@@ -362,33 +240,42 @@ export const BudgetProvider = ({ children }) => {
     (bill) => {
       const amount = positiveAmount(bill.amount);
       if (!bill.title?.trim() || !amount) return false;
-      update((current) => ({
+      return update((current) => {
+        const dueDay = Number(bill.dueDay);
+        if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) throw new Error('Due day must be 1–31.');
+        if (bill.id) return { ...current, bills: current.bills.map((item) => item.id === bill.id ? { ...item, ...bill, amount, dueDay } : item) };
+        return ({
         ...current,
         bills: [
           {
             ...bill,
             id: newId(),
             amount,
-            dueDay: Math.min(31, Math.max(1, Math.round(Number(bill.dueDay) || 1))),
+            dueDay,
             paidMonth: null,
+            paymentHistory: {},
           },
           ...current.bills,
         ],
-      }));
-      return true;
+        });
+      });
     },
     [update]
   );
 
+  const deleteBill = useCallback((id) => update((current) => ({ ...current, bills: current.bills.filter((bill) => bill.id !== id) })), [update]);
+
   const toggleBill = useCallback(
-    (id) =>
+    (id, period = monthKey()) =>
       update((current) => ({
         ...current,
         bills: current.bills.map((bill) =>
           bill.id === id
             ? {
                 ...bill,
-                paidMonth: bill.paidMonth === monthKey() ? null : monthKey(),
+              ...(bill.paidMonth === period || bill.paymentHistory?.[period]
+                ? clearBillPayment(bill, period)
+                : recordBillPayment(bill, period, new Date().toISOString())),
               }
             : bill
         ),
@@ -408,6 +295,9 @@ export const BudgetProvider = ({ children }) => {
   const updateSettings = useCallback(
     (settings) =>
       update((current) => {
+        if (settings.currency && settings.currency !== current.settings.currency && (current.transactions.length || current.bills.length)) {
+          throw new Error('Currency is locked while financial records exist.');
+        }
         const nextSettings = { ...current.settings, ...settings };
         if (Object.prototype.hasOwnProperty.call(settings, "monthlyBudget")) {
           nextSettings.monthlyBudget =
@@ -416,6 +306,10 @@ export const BudgetProvider = ({ children }) => {
         return {
           ...current,
           settings: nextSettings,
+          ...(settings.monthlyBudget ? { periodBudgets: { ...current.periodBudgets, [monthKey()]: {
+            monthlyBudget: nextSettings.monthlyBudget,
+            categoryBudgets: normalizeCategoryBudgets(current.periodBudgets[monthKey()]?.categoryBudgets || current.categoryBudgets, nextSettings.monthlyBudget),
+          } } } : {}),
           categoryBudgets: normalizeCategoryBudgets(
             current.categoryBudgets,
             nextSettings.monthlyBudget
@@ -446,15 +340,17 @@ export const BudgetProvider = ({ children }) => {
     [update]
   );
 
-  const loadDemo = useCallback(
-    () => setData({ ...demoState, bills: normalizeBills(demoState.bills) }),
-    []
-  );
-  const resetData = useCallback(() => setData(starterState), []);
+  const resetData = useCallback(() => update(() => starterState), [update]);
+  const currentPlan = data.periodBudgets[monthKey()];
 
   const value = useMemo(
     () => ({
       ...data,
+      categoryBudgets: currentPlan?.categoryBudgets || data.categoryBudgets,
+      settings: currentPlan ? { ...data.settings, monthlyBudget: currentPlan.monthlyBudget } : data.settings,
+      defaultCategoryBudgets: data.categoryBudgets,
+      syncStatus: store.status,
+      retrySync: store.retry,
       isLoading,
       storageError,
       addTransaction,
@@ -462,17 +358,19 @@ export const BudgetProvider = ({ children }) => {
       deleteTransaction,
       setCategoryBudget,
       saveBill,
+      deleteBill,
       toggleBill,
       updateProfile,
       updateSettings,
       completeOnboarding,
       signIn,
       logout,
-      loadDemo,
       resetData,
     }),
     [
+      store.status, store.retry,
       data,
+      currentPlan,
       isLoading,
       storageError,
       addTransaction,
@@ -480,13 +378,13 @@ export const BudgetProvider = ({ children }) => {
       deleteTransaction,
       setCategoryBudget,
       saveBill,
+      deleteBill,
       toggleBill,
       updateProfile,
       updateSettings,
       completeOnboarding,
       signIn,
       logout,
-      loadDemo,
       resetData,
     ]
   );

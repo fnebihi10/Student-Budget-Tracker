@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { Stack, Tab } from './routes';
 import { StatusBar } from "expo-status-bar";
 import React, { useContext } from "react";
 import {
@@ -37,9 +36,9 @@ import { GoalsContext } from "../context/GoalsContext";
 import { SplitsContext } from "../context/SplitsContext";
 import { SubscriptionsContext } from "../context/SubscriptionsContext";
 import { colors } from "../design";
+import AppButton from '../components/AppButton';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
 
 const tabIcons = {
   Home: ["home", "home-outline"],
@@ -95,11 +94,11 @@ function LoadingScreen() {
 }
 
 export default function AppNavigator() {
-  const { isLoading, storageError } = useContext(BudgetContext);
-  const { user, isDemo, isAuthLoading, authError } = useContext(AuthContext);
-  const { goalsStorageError, isLoadingGoals } = useContext(GoalsContext);
-  const { splitsStorageError, isLoadingSplits } = useContext(SplitsContext);
-  const { subscriptionsStorageError, isLoadingSubscriptions } =
+  const { isLoading, storageError, syncStatus: budgetStatus, retrySync: retryBudget } = useContext(BudgetContext);
+  const { user, isDemo, isAuthLoading, authError, isRecovering } = useContext(AuthContext);
+  const { goalsStorageError, isLoadingGoals, syncStatus: goalsStatus, retrySync: retryGoals } = useContext(GoalsContext);
+  const { splitsStorageError, isLoadingSplits, syncStatus: splitsStatus, retrySync: retrySplits } = useContext(SplitsContext);
+  const { subscriptionsStorageError, isLoadingSubscriptions, syncStatus: subscriptionsStatus, retrySync: retrySubscriptions } =
     useContext(SubscriptionsContext);
   const visibleError =
     authError ||
@@ -113,12 +112,15 @@ export default function AppNavigator() {
     (isLoadingGoals || isLoadingSplits || isLoadingSubscriptions);
 
   if (isLoading || isAuthLoading || isCloudDataLoading) return <LoadingScreen />;
+  const loading = [budgetStatus, goalsStatus, splitsStatus, subscriptionsStatus].includes('loading');
+  const pending = [budgetStatus, goalsStatus, splitsStatus, subscriptionsStatus].includes('pending');
+  const message = visibleError || (loading ? 'Reloading cloud records…' : pending ? 'Saving… awaiting confirmation.' : '');
 
   return (
     <>
       <StatusBar style="dark" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!user && !isDemo ? (
+        {isRecovering && user ? <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} /> : !user && !isDemo ? (
           <Stack.Group>
             <Stack.Screen name="Welcome" component={LoginScreen} />
             <Stack.Screen name="Setup" component={RegisterScreen} />
@@ -194,10 +196,12 @@ export default function AppNavigator() {
           </Stack.Group>
         )}
       </Stack.Navigator>
-      {visibleError ? (
+      {message ? (
         <View accessibilityRole="alert" style={styles.errorBanner}>
           <Ionicons name="cloud-offline-outline" size={17} color={colors.surface} />
-          <Text style={styles.errorText}>{visibleError}</Text>
+          <Text style={styles.errorText}>{message}</Text>
+          {storageError || goalsStorageError || splitsStorageError || subscriptionsStorageError ?
+            <AppButton title="Reload" variant="secondary" onPress={() => Promise.all([retryBudget(), retryGoals(), retrySplits(), retrySubscriptions()])} disabled={pending || loading} /> : null}
         </View>
       ) : null}
     </>

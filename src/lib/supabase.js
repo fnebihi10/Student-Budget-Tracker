@@ -11,23 +11,36 @@ const supabasePublishableKey =
 export const supabaseConfigured = Boolean(
   supabaseUrl && supabasePublishableKey
 );
-
-if (!supabaseConfigured) {
-  throw new Error(
-    "Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY."
-  );
+export async function clearPersistedSession() {
+  if (!supabaseConfigured) return;
+  const project = new URL(supabaseUrl).hostname.split('.')[0];
+  const key = `sb-${project}-auth-token`;
+  await AsyncStorage.multiRemove([key, `${key}-code-verifier`, `${key}-user`]);
 }
 
-export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+const unavailable = async () => ({ data: {}, error: new Error('Cloud accounts are unavailable. Configure Supabase or use the isolated demo.') });
+const demoOnlyClient = {
+  auth: {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+    signInWithPassword: unavailable, signUp: unavailable, resend: unavailable,
+    resetPasswordForEmail: unavailable, updateUser: unavailable,
+    exchangeCodeForSession: unavailable, setSession: unavailable,
+    signOut: async () => ({ error: null }),
+  },
+};
+
+export const supabase = supabaseConfigured ? createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
     ...(Platform.OS !== "web" ? { storage: AsyncStorage } : {}),
     autoRefreshToken: true,
     persistSession: true,
+    flowType: 'pkce',
     detectSessionInUrl: Platform.OS === "web",
   },
-});
+}) : demoOnlyClient;
 
-if (Platform.OS !== "web") {
+if (supabaseConfigured && Platform.OS !== "web") {
   AppState.addEventListener("change", (state) => {
     if (state === "active") supabase.auth.startAutoRefresh();
     else supabase.auth.stopAutoRefresh();

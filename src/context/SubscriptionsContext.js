@@ -1,23 +1,17 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useConfirmedStore } from './useConfirmedStore';
 import React, {
   createContext,
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
-  useState,
 } from "react";
-import { AuthContext } from "./AuthContext";
 import {
-  deleteRow,
   fetchRows,
   newId,
   subscriptionFromRow,
   subscriptionToRow,
-  upsertRows,
+  persistCollection,
 } from "../services/cloudData";
 
-const STORAGE_KEY = "@pocketwise/personal-subscriptions/v1";
 
 const demoSubscriptions = [
   {
@@ -70,76 +64,13 @@ const demoSubscriptions = [
 export const SubscriptionsContext = createContext(null);
 
 export function SubscriptionsProvider({ children }) {
-  const { user } = React.useContext(AuthContext);
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(true);
-  const [subscriptionsStorageError, setSubscriptionsStorageError] = useState("");
-  const [subscriptionsCloudReady, setSubscriptionsCloudReady] = useState(false);
-  const cloudUserRef = useRef(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((stored) => {
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (!Array.isArray(parsed)) throw new Error("Invalid subscriptions data");
-          setSubscriptions(parsed);
-        }
-      })
-      .catch(() =>
-        setSubscriptionsStorageError("Subscriptions could not be loaded.")
-      )
-      .finally(() => setIsLoadingSubscriptions(false));
-  }, []);
-
-  useEffect(() => {
-    if (isLoadingSubscriptions) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(subscriptions)).catch(
-      () => setSubscriptionsStorageError("Subscriptions could not be saved.")
-    );
-  }, [subscriptions, isLoadingSubscriptions]);
-
-  useEffect(() => {
-    if (!user) {
-      const shouldClear = Boolean(cloudUserRef.current);
-      cloudUserRef.current = null;
-      if (shouldClear) {
-        queueMicrotask(() => {
-          setSubscriptions([]);
-          setSubscriptionsCloudReady(false);
-        });
-      }
-      return;
-    }
-    if (isLoadingSubscriptions || cloudUserRef.current === user.id) return;
-    cloudUserRef.current = user.id;
-    setIsLoadingSubscriptions(true);
-    fetchRows("subscriptions", user.id, "next_billing_date")
-      .then((rows) => {
-        setSubscriptions(rows.map(subscriptionFromRow));
-        setSubscriptionsCloudReady(true);
-      })
-      .catch(() => {
-        setSubscriptionsCloudReady(false);
-        setSubscriptionsStorageError("Subscriptions could not be loaded from the cloud.");
-      })
-      .finally(() => setIsLoadingSubscriptions(false));
-  }, [user, isLoadingSubscriptions]);
-
-  useEffect(() => {
-    if (
-      !user ||
-      cloudUserRef.current !== user.id ||
-      !subscriptionsCloudReady ||
-      isLoadingSubscriptions
-    ) return;
-    const timer = setTimeout(() => {
-      upsertRows("subscriptions", user.id, subscriptions.map(subscriptionToRow)).catch(
-        () => setSubscriptionsStorageError("Subscriptions could not be synced.")
-      );
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [user, subscriptions, subscriptionsCloudReady, isLoadingSubscriptions]);
+  const store = useConfirmedStore('subscriptions', [], demoSubscriptions,
+    async (user) => (await fetchRows('subscriptions', user.id)).map(subscriptionFromRow),
+    (userId, before, after) => persistCollection('subscriptions', userId, before, after, subscriptionToRow));
+  const subscriptions = store.data;
+  const isLoadingSubscriptions = store.status === 'loading' && !store.initialized;
+  const subscriptionsStorageError = store.error;
+  const setSubscriptions = store.mutate;
 
   const saveSubscription = useCallback((subscription) => {
     const amount = Number(subscription.amount);
@@ -150,7 +81,7 @@ export function SubscriptionsProvider({ children }) {
     ) {
       return false;
     }
-    setSubscriptions((current) => {
+    return setSubscriptions((current) => {
       if (subscription.id) {
         return current.map((item) =>
           item.id === subscription.id ? { ...item, ...subscription } : item
@@ -167,11 +98,10 @@ export function SubscriptionsProvider({ children }) {
         ...current,
       ];
     });
-    return true;
-  }, []);
+  }, [setSubscriptions]);
 
   const toggleSubscription = useCallback((id) => {
-    setSubscriptions((current) =>
+    return setSubscriptions((current) =>
       current.map((item) =>
         item.id === id
           ? {
@@ -181,43 +111,34 @@ export function SubscriptionsProvider({ children }) {
           : item
       )
     );
-  }, []);
+  }, [setSubscriptions]);
 
-  const deleteSubscription = useCallback((id) => {
-    setSubscriptions((current) => current.filter((item) => item.id !== id));
-    if (user) {
-      deleteRow("subscriptions", user.id, id).catch(() =>
-        setSubscriptionsStorageError("The subscription could not be deleted from the cloud.")
-      );
-    }
-  }, [user]);
+  const deleteSubscription = useCallback((id) =>
+    setSubscriptions((current) => current.filter((item) => item.id !== id)), [setSubscriptions]);
 
-  const loadDemoSubscriptions = useCallback(
-    () => setSubscriptions(demoSubscriptions),
-    []
-  );
 
-  const resetSubscriptions = useCallback(() => setSubscriptions([]), []);
+  const resetSubscriptions = useCallback(() => setSubscriptions(() => []), [setSubscriptions]);
 
   const value = useMemo(
     () => ({
+      syncStatus: store.status,
+      retrySync: store.retry,
       subscriptions,
       isLoadingSubscriptions,
       subscriptionsStorageError,
       saveSubscription,
       toggleSubscription,
       deleteSubscription,
-      loadDemoSubscriptions,
       resetSubscriptions,
     }),
     [
+      store.status, store.retry,
       subscriptions,
       isLoadingSubscriptions,
       subscriptionsStorageError,
       saveSubscription,
       toggleSubscription,
       deleteSubscription,
-      loadDemoSubscriptions,
       resetSubscriptions,
     ]
   );

@@ -1,5 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { supabase } from "../lib/supabase";
+import { openingBalance, validateFinancialRow, positiveMoney, assertText } from '../domain/finance';
 
 export const newId = () => Crypto.randomUUID();
 
@@ -7,24 +8,22 @@ const ensure = ({ error }) => {
   if (error) throw error;
 };
 
-export async function fetchRows(table, userId, orderColumn = "created_at") {
-  const result = await supabase
-    .from(table)
-    .select("*")
-    .eq("user_id", userId)
-    .order(orderColumn, { ascending: false });
-  ensure(result);
-  return result.data || [];
-}
-
-export async function upsertRows(table, userId, rows) {
-  if (!rows.length) return;
-  ensure(
-    await supabase.from(table).upsert(
-      rows.map((row) => ({ ...row, user_id: userId })),
-      { onConflict: "id" }
-    )
-  );
+export async function fetchRows(table, userId) {
+  const rows = [];
+  const pageSize = 500;
+  let cursor = null;
+  for (;;) {
+    let query = supabase.from(table).select('*')
+      .eq('user_id', userId)
+      .order('id', { ascending: false })
+      .limit(pageSize);
+    if (cursor) query = query.lt('id', cursor);
+    const result = await query;
+    ensure(result);
+    rows.push(...(result.data || []));
+    if ((result.data || []).length < pageSize) return rows;
+    cursor = result.data[result.data.length - 1].id;
+  }
 }
 
 export async function deleteRow(table, userId, id) {
@@ -35,6 +34,65 @@ export async function deleteRow(table, userId, id) {
       .eq("user_id", userId)
       .eq("id", id)
   );
+}
+
+// Inserts are idempotent by stable UUID. Edits are UPDATE only: they cannot
+// recreate a row deleted by another device. No snapshot-wide upserts.
+export async function persistCollection(table, userId, before, after, toRow = (row) => row) {
+  const old = new Map(before.map((row) => [row.id, row]));
+  const next = new Set(after.map((row) => row.id));
+  for (const row of after) {
+    if (old.get(row.id) === row) continue;
+    const value = { ...toRow(row), user_id: userId };
+    validateFinancialRow(table, value);
+    if (!old.has(row.id)) {
+      ensure(await supabase.from(table).upsert(value, { onConflict: 'id', ignoreDuplicates: true }));
+    } else {
+      const result = await supabase.from(table).update({ ...value, revision: (old.get(row.id).revision || 0) + 1 })
+        .eq('user_id', userId).eq('id', row.id)
+        .eq('revision', old.get(row.id).revision || 0).select('revision').single();
+      ensure(result);
+      row.revision = result.data.revision;
+    }
+  }
+  for (const id of old.keys()) if (!next.has(id)) await deleteRow(table, userId, id);
+}
+
+export const transactionToRow = (item) => ({
+  id: item.id, type: item.type, amount: item.amount, category: item.category,
+  title: item.title, note: item.note || '', transaction_date: item.date,
+  recurring: Boolean(item.recurring),
+});
+export const billToRow = (bill) => ({
+  id: bill.id, title: bill.title, amount: bill.amount, category: bill.category,
+  due_day: bill.dueDay, paid_month: bill.paidMonth,
+  payment_history: bill.paymentHistory || {},
+});
+
+export async function persistBudgetChanges(userId, before, after) {
+  if (before.profile !== after.profile) {
+    assertText(after.profile.name, 80, 'Name');
+    if ((after.profile.school || '').length > 160) throw new Error('School must be at most 160 characters.');
+    const result = await supabase.from('profiles').update({ name: after.profile.name, school: after.profile.school, revision: (before.profile.revision || 0) + 1 }).eq('id', userId)
+      .eq('revision', before.profile.revision || 0).select('revision').single();
+    ensure(result);
+    after.profile.revision = result.data.revision;
+  }
+  if (before.settings !== after.settings || before.categoryBudgets !== after.categoryBudgets || before.periodBudgets !== after.periodBudgets) {
+    positiveMoney(after.settings.monthlyBudget);
+    if (!['EUR', 'USD', 'GBP', 'HUF'].includes(after.settings.currency)) throw new Error('Invalid currency.');
+    const result = await supabase.from('user_settings').update({
+      currency: after.settings.currency, monthly_budget: after.settings.monthlyBudget,
+      notifications: after.settings.notifications, category_budgets: after.categoryBudgets,
+      period_budgets: after.periodBudgets,
+      revision: (before.settings.revision || 0) + 1,
+    }).eq('user_id', userId).eq('revision', before.settings.revision || 0).select('revision').single();
+    ensure(result);
+    // category-only changes also receive a new settings version.
+    after.settings = { ...after.settings, revision: result.data.revision };
+  }
+  if (before.transactions !== after.transactions) await persistCollection('transactions', userId, before.transactions, after.transactions, transactionToRow);
+  if (before.bills !== after.bills) await persistCollection('bills', userId, before.bills, after.bills, billToRow);
 }
 
 export async function deleteOwnAccount() {
@@ -59,54 +117,8 @@ export async function fetchBudgetData(user) {
   };
 }
 
-export async function syncBudgetData(userId, data) {
-  const profileResult = await supabase.from("profiles").upsert({
-    id: userId,
-    name: data.profile.name,
-    school: data.profile.school,
-  });
-  ensure(profileResult);
-
-  const settingsResult = await supabase.from("user_settings").upsert({
-    user_id: userId,
-    currency: data.settings.currency,
-    monthly_budget: data.settings.monthlyBudget,
-    notifications: data.settings.notifications,
-    category_budgets: data.categoryBudgets,
-    subscription_plan: data.subscription.plan,
-    subscription_status: data.subscription.status,
-  });
-  ensure(settingsResult);
-
-  await upsertRows(
-    "transactions",
-    userId,
-    data.transactions.map((item) => ({
-      id: item.id,
-      type: item.type,
-      amount: item.amount,
-      category: item.category,
-      title: item.title,
-      note: item.note || "",
-      transaction_date: item.date,
-      recurring: Boolean(item.recurring),
-    }))
-  );
-  await upsertRows(
-    "bills",
-    userId,
-    data.bills.map((bill) => ({
-      id: bill.id,
-      title: bill.title,
-      amount: bill.amount,
-      category: bill.category,
-      due_day: bill.dueDay,
-      paid_month: bill.paidMonth,
-    }))
-  );
-}
-
 export const transactionFromRow = (row) => ({
+  revision: row.revision || 0,
   id: row.id,
   type: row.type,
   amount: Number(row.amount),
@@ -118,6 +130,8 @@ export const transactionFromRow = (row) => ({
 });
 
 export const billFromRow = (row) => ({
+  revision: row.revision || 0,
+  paymentHistory: row.payment_history || {},
   id: row.id,
   title: row.title,
   amount: Number(row.amount),
@@ -144,6 +158,7 @@ export const subscriptionToRow = (item) => ({
 });
 
 export const subscriptionFromRow = (row) => ({
+  revision: row.revision || 0,
   id: row.id,
   serviceId: row.service_id,
   name: row.name,
@@ -161,6 +176,7 @@ export const subscriptionFromRow = (row) => ({
 });
 
 export const goalToRow = (goal) => ({
+  starting_balance: openingBalance(goal),
   id: goal.id,
   template_id: goal.templateId,
   name: goal.name,
@@ -175,6 +191,8 @@ export const goalToRow = (goal) => ({
 });
 
 export const goalFromRow = (row) => ({
+  revision: row.revision || 0,
+  startingBalance: row.starting_balance == null ? undefined : Number(row.starting_balance),
   id: row.id,
   templateId: row.template_id,
   name: row.name,
@@ -203,6 +221,7 @@ export const splitToRow = (item) => ({
 });
 
 export const splitFromRow = (row) => ({
+  revision: row.revision || 0,
   id: row.id,
   title: row.title,
   person: row.person,
