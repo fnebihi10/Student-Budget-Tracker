@@ -31,7 +31,7 @@ installed headless Edge 154.0.4258.53; production-mode local Expo demo export.
 | Expo Doctor | **21/21 passed** after clean installation; retained supported Expo SDK 57 stack |
 | Browser | **18/18 passed** on the final exported application, including four-width axe/large-text/keyboard/clipping checks, dense trackers, financial workflows and the corrected deterministic 10,000-row fixture |
 | Integration runner without dedicated credentials | Exits before network with explicit **UNVERIFIED** message; isolated harness syntax checks pass, real Auth/PostgREST/RPC behavior is unverified |
-| CI | [Original remote verify job](https://github.com/fnebihi10/Student-Budget-Tracker/actions/runs/37201604741/job/111434264932) passed, including browser log `18 passed (2.5m)`; overall run failed on the timezone job. Corrected full-suite matrix awaits remote confirmation. Isolated authenticated workflow remains unverified |
+| CI | [Corrected run 37202872316](https://github.com/fnebihi10/Student-Budget-Tracker/actions/runs/37202872316) succeeded against `8c27fa3`: all five jobs passed, each of four zones logged 56/56 tests, and browser logged `18 passed (2.1m)`. The previous overall run failed on the now-corrected timezone job. Isolated authenticated workflow remains unverified |
 
 The browser suite covers transaction CRUD/restart, currency locking and JSON/CSV
 exports; budgets, bill paid history/payment versus tracker-only marking;
