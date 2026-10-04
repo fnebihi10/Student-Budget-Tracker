@@ -5,6 +5,16 @@ remaining hosted-account, native-runtime or tooling-advisory checks. This decisi
 does not prevent reviewing or merging source changes. No deployment, production
 database change, billing activation or signing operation was performed.
 
+## Current-checkout continuation
+
+[Continuation evidence](RELEASE_FOLLOWUP.md) records local checks against
+`aff1b7fbab73253142285aeadc3d0b6311521d80` plus the reproduced authenticated
+Playwright preflight fix. Remote HEAD matched that clean starting revision.
+Hosted credentials and native tooling remain unavailable. The fresh online audit
+still has 46 high entries, with no published fixed braces/node-forge version.
+No new hosted/native acceptance or owner waiver is recorded. The release hold
+remains in force. [Native setup and commands](NATIVE_VERIFICATION.md).
+
 | Problem | Implementation / procedure | Observed result | Remaining dependency |
 | --- | --- | --- | --- |
 | Three timezone test failures; Jest 29 ignored the plural filter flag | Explicit UTC fixtures and ISO assertions in date, subscription and calculation tests; two explicit-offset month-boundary regressions; `npm run test:timezones` runs the full suite in separate processes for all four zones | Reproduced 3 failures before the fix; afterwards 18 suites / 56 tests pass locally and on GitHub in UTC, Berlin, Los Angeles and Kiritimati. Lint passes. [Machine-readable local summary](timezone-verification.json) | None for the reproduced test-contract failures |

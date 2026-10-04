@@ -5,6 +5,17 @@ The harness exits with code 2 before creating a client when configuration is
 missing. Local PGlite and mocked session tests are complementary evidence, not
 equivalent to real Auth, PostgREST, RPC, or device behavior.
 
+The [current-checkout continuation](RELEASE_FOLLOWUP.md) confirmed credentials
+are still absent. Authenticated Playwright now checks the isolated configuration
+and `dist-test/index.html` before starting its server/browser, and never reuses
+an existing server. Missing setup fails explicitly; it is not a skipped pass.
+Stop any process occupying port 4173 before this run. Keep logs outside
+`test-results`, which Playwright clears at startup (for example
+`.expo/release-followup/`). Hosted fixture cleanup remains unverified until an
+actual isolated run completes; retain teardown results and verify fixture users
+and owner-scoped rows are gone. [Native preparation](NATIVE_VERIFICATION.md)
+includes public-only build environment commands and separate device results.
+
 ## Project preparation
 
 Use a disposable Supabase project containing no production users or records.

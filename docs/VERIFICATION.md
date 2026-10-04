@@ -1,5 +1,11 @@
 # Verification — 2026-10-04
 
+Latest continuation: [current checkout, commands, failures and blockers](RELEASE_FOLLOWUP.md)
+records `aff1b7f` plus the authenticated harness preflight fix. The results below
+remain the earlier upgrade report; they are not new hosted or native acceptance.
+[Native continuation setup](NATIVE_VERIFICATION.md) keeps emulator, physical-device
+and manual screen-reader evidence separate. Release remains on hold.
+
 Pocketwise's upgrade includes strict TypeScript throughout the application,
 lifecycle-aware financial refresh, revision-aware drafts/deletions, atomic
 idempotent bill payments, guarded goal withdrawals, server report aggregates,

@@ -33,3 +33,31 @@ again returned braces 3.0.3 and node-forge 1.4.0. The explicit decision is
 
 The older forge advisories fixed in 1.4.0 do not establish that this later RSA
 finding is fixed: see the upstream [incomplete-fix report](https://github.com/digitalbazaar/forge/issues/1149).
+
+## Current-checkout recheck and owner decision
+
+The continuation against `aff1b7fbab73253142285aeadc3d0b6311521d80` repeated
+online npm audit and both registry queries on 2026-10-04. Audit exits 1 with 46
+high entries; [fresh raw evidence](dependency-audit-followup.json) is separate
+from the earlier report. Latest published versions remain braces 3.0.3 and
+node-forge 1.4.0. Both linked primary advisory pages still list no patched version.
+No dependency/lockfile changes or incompatible downgrades were made.
+
+`npm ls braces node-forge` confirms Expo CLI -> Metro file-map -> micromatch ->
+braces, and Expo CLI -> code-signing-certificates -> forge (plus a direct CLI forge
+dependency). Installed code-signing tooling uses certificate and CSR verification
+and public-key signature verification. These are concrete affected build/signing
+workflows; no matching imports were found in application source. This limited
+inspection does not prove absence from every bundle or every execution path.
+
+Pending owner decision (not approved by the agent): retain release hold, or record
+a dated, scoped risk acceptance for **both** GHSA-vfj7-8cjw-p6xm and
+GHSA-86w9-cpqp-85rv. Specify release/build pipelines in scope, accountable owner,
+review date and remediation deadline. Document controls over glob patterns and
+certificate/CSR inputs, restrict tooling execution to trusted project inputs,
+and isolate build workers. Do not process external cryptographic inputs using
+this tooling without reassessment. Residual uncertainty includes dependency paths
+outside the inspected code, actual exploitability of each signing workflow and
+whether upstream fixes will land within the release window. Passing tests and
+exports do not waive that uncertainty. Monitor upstream, then verify any published
+compatible fixes with the checks listed above before changing the decision.
