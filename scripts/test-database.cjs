@@ -80,6 +80,44 @@ const { PGlite } = require('@electric-sql/pglite');
     });
     assert.equal(changed.rows.length, 0);
   }
+  await asUser(a);
+  const paymentBill = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const operation = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const otherOperation = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  await db.exec(`insert into public.bills(id,user_id,title,amount,category,due_day) values ('${paymentBill}','${a}','Atomic bill',12.34,'food',3)`);
+  const pay = (id = operation, record = true, period = '2026-10', revision = 0) => db.query(
+    `select public.record_bill_payment('${id}','${paymentBill}','${period}',${revision},${record},'2026-10-03T12:00:00Z') as receipt`);
+  const receipt = (await pay()).rows[0].receipt;
+  assert.equal(receipt.bill.revision, 1);
+  assert.equal(receipt.transaction.id, operation);
+  assert.deepEqual((await pay()).rows[0].receipt, receipt); // Lost response retry.
+  assert.deepEqual((await pay(otherOperation)).rows[0].receipt, receipt); // Duplicate click, new UUID.
+  assert.equal((await db.query(`select * from public.transactions where id='${operation}'`)).rows.length, 1);
+  await assert.rejects(() => pay(operation, false)); // Cannot change intent on retry.
+  await assert.rejects(() => pay(otherOperation, false, '2026-11', 0)); // Stale revision.
+  const marked = (await pay(otherOperation, false, '2026-11', 1)).rows[0].receipt;
+  assert.equal(marked.transaction, null);
+  assert.equal(marked.bill.revision, 2);
+  // Force failure in the transaction insert; the bill and receipt roll back.
+  const collision = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+  await db.exec(`insert into public.transactions(id,user_id,type,amount,category,title) values ('${collision}','${a}','expense',1,'food','Existing transaction')`);
+  await assert.rejects(() => pay(collision, true, '2026-12', 2));
+  assert.equal((await db.query(`select payment_history ? '2026-12' as paid from public.bills where id='${paymentBill}'`)).rows[0].paid, false);
+  assert.equal((await db.query(`select * from public.financial_operations where id='${collision}'`)).rows.length, 0);
+  // Immutable receipt metadata must not replay an old or deleted ledger row.
+  await db.exec(`update public.transactions set title='Reviewed payment', revision=revision+1 where id='${operation}'`);
+  assert.equal((await pay()).rows[0].receipt.transaction.title, 'Reviewed payment');
+  assert.equal((await pay()).rows[0].receipt.bill.revision, 2);
+  await db.exec(`delete from public.transactions where id='${operation}'`);
+  assert.equal((await pay()).rows[0].receipt.transaction, null);
+  assert.equal((await pay('abababab-abab-4bab-8bab-abababababab')).rows[0].receipt.transaction, null);
+  await db.exec(`update public.bills set payment_history=payment_history-'2026-10',revision=revision+1 where id='${paymentBill}'`);
+  await assert.rejects(() => pay()); // Unmarking never makes an existing payment replayable as a new expense.
+  assert.equal((await db.query(`select * from public.transactions where id='${operation}'`)).rows.length, 0);
+  await fail(`insert into public.financial_operations(id,user_id,bill_id,period,record_transaction,response) values ('${collision}','${a}','${paymentBill}','2026-12',true,'{}')`);
+  await asUser(b);
+  assert.equal((await db.query('select * from public.financial_operations')).rows.length, 0);
+  await assert.rejects(() => pay());
   await db.exec(`reset role; set role anon; set request.jwt.claim.sub = '';`);
   for (const table of [...Object.keys(records), 'profiles', 'user_settings']) {
     await fail(`select * from public.${table}`);
@@ -87,6 +125,7 @@ const { PGlite } = require('@electric-sql/pglite');
   }
   await fail('select public.delete_own_account()');
   await fail("select public.monthly_totals('2026-10')");
+  await assert.rejects(() => pay());
   await db.exec(`reset role; set role authenticated; set request.jwt.claim.sub = '';`);
   await fail('select public.delete_own_account()');
   await asUser(a);
@@ -96,6 +135,7 @@ const { PGlite } = require('@electric-sql/pglite');
   assert.equal((await db.query(`select * from auth.users where id='${b}'`)).rows.length, 1);
   for (const table of Object.keys(records)) assert.equal((await db.query(`select * from public.${table} where user_id='${a}'`)).rows.length, 0);
   assert.equal((await db.query(`select * from public.deleted_financial_records where user_id='${a}'`)).rows.length,0);
+  assert.equal((await db.query(`select * from public.financial_operations where user_id='${a}'`)).rows.length,0);
   await db.close();
   console.log('PASS: all migrations, anonymous/two-user RLS, immutable ownership, currency/entitlement guards, revision conflicts, self-deletion and cascades (disposable PGlite).');
 })().catch((error) => { console.error(error.message); process.exitCode = 1; });

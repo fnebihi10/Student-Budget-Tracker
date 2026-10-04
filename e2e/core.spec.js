@@ -1,4 +1,34 @@
+const { Buffer } = require('node:buffer');
 const { test, expect } = require('@playwright/test');
+
+test('keyboard activation, form entry and modal focus containment/restoration', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Explore with demo data', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Add a transaction', exact: true }).focus();
+  await page.keyboard.press('Space');
+  await page.getByLabel('Amount', { exact: true }).focus();
+  await page.keyboard.type('12.34');
+  await page.getByLabel('Description', { exact: true }).focus();
+  await page.keyboard.type('Keyboard regression');
+  await page.getByRole('button', { name: 'Save expense', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('tab', { name: /Activity/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: /^Keyboard regression,/ })).toBeVisible();
+  await page.getByRole('tab', { name: /Budgets/ }).focus();
+  await page.keyboard.press('Enter');
+  const food = page.getByRole('button', { name: /Food.*left/ });
+  await food.focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByLabel('Category limit', { exact: true })).toBeFocused();
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('Tab');
+    expect(await page.getByRole('dialog').evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(food).toBeFocused();
+});
 
 test('env-free demo, transaction CRUD, restart, currency lock and file export', async ({ page }) => {
   const errors = [];

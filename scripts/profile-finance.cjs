@@ -1,3 +1,4 @@
+const { Buffer } = require('node:buffer');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -14,6 +15,7 @@ const query = { update() { requests++; return query; }, eq() { return query; }, 
 Module._load = function(name, parent, ...rest) {
   if (name === '@react-native-async-storage/async-storage') return storage;
   if (name === 'expo-crypto') return { randomUUID: () => 'uuid' };
+  if (name === '@expo/vector-icons') return { Ionicons: { glyphMap: {} } };
   if (name === '../lib/supabase') return { supabase: { from: () => query } };
   return originalLoad.call(this, name, parent, ...rest);
 };

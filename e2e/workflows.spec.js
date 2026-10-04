@@ -1,0 +1,74 @@
+const { test, expect } = require('@playwright/test');
+const AxeBuilder = require('@axe-core/playwright').default;
+const month = () => new Date().toISOString().slice(0, 7);
+const start = async (page) => { await page.goto('/'); await page.getByRole('button', { name: 'Explore with demo data', exact: true }).click(); };
+const profile = async (page) => page.getByRole('tab', { name: /Profile/ }).click();
+const back = async (page) => page.getByRole('button', { name: 'Back', exact: true }).first().click();
+
+test('budgets, atomic bill payment, paid history, and tracker-only marking persist', async ({ page }) => {
+  await start(page); await page.getByRole('tab', { name: /Budgets/ }).click();
+  await page.getByRole('button', { name: /Food.*left/ }).click();
+  await page.getByLabel('Category limit', { exact: true }).fill('180');
+  await page.getByRole('button', { name: 'Save limit', exact: true }).click();
+  await page.getByRole('button', { name: 'Record payment for Phone plan', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: `Phone plan paid for ${month()}`, exact: true })).toBeChecked();
+  await page.getByRole('button', { name: 'Edit Phone plan', exact: true }).click();
+  await expect(page.getByText(`${month()} — marked paid`, { exact: true })).toBeVisible(); await back(page);
+  await page.getByRole('checkbox', { name: `Music student paid for ${month()}`, exact: true }).click();
+  await page.getByRole('tab', { name: /Activity/ }).click();
+  await expect(page.getByRole('button', { name: /^Phone plan,/ })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /^Music student,/ })).toHaveCount(0);
+  await page.reload(); await page.getByRole('button', { name: 'Explore with demo data', exact: true }).click();
+  await page.getByRole('tab', { name: /Budgets/ }).click();
+  await expect(page.getByRole('checkbox', { name: `Phone plan paid for ${month()}`, exact: true })).toBeChecked();
+});
+
+test('subscription management, goal withdrawal, and personal debt settlement', async ({ page }) => {
+  await start(page); await profile(page);
+  await page.getByText('Subscriptions', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Add subscription', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Test subscription');
+  await page.getByLabel('Amount', { exact: true }).fill('4.25');
+  await page.getByRole('button', { name: 'Track subscription', exact: true }).click();
+  await expect(page.getByText('Test subscription', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: /Pause Test subscription/ }).click();
+  await expect(page.getByRole('button', { name: /Resume Test subscription/ })).toBeVisible(); await back(page);
+  await page.getByText('Savings goals', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Manage savings goal Emergency cushion', exact: true }).click();
+  await page.getByRole('button', { name: 'Withdraw', exact: true }).click();
+  await page.getByLabel('Contribution amount', { exact: true }).fill('25');
+  await page.getByLabel('Contribution note', { exact: true }).fill('Withdrawal regression');
+  await page.getByRole('button', { name: 'Record withdrawal', exact: true }).click();
+  await expect(page.getByText('Withdrawal regression', { exact: true })).toBeVisible(); await back(page); await back(page);
+  await page.getByText('Split costs', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Add personal debt', exact: true }).click();
+  await page.getByLabel('Description', { exact: true }).fill('Test settlement');
+  await page.getByLabel('Person', { exact: true }).fill('Taylor');
+  await page.getByLabel('Amount', { exact: true }).fill('15.50');
+  await page.getByRole('button', { name: 'Track shared expense', exact: true }).click();
+  await page.getByText('Test settlement', { exact: true }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark balance settled for Test settlement', exact: true }).click();
+  await expect(page.getByText('Recently settled', { exact: true })).toBeVisible();
+});
+
+test('corrupt demo cache blocks editing, preserves drafts, and recovers after repair', async ({ page }) => {
+  await start(page);
+  const key = '@pocketwise/v2/demo/budget/snapshot';
+  const saved = await page.evaluate((key) => localStorage.getItem(key), key);
+  await page.evaluate((key) => localStorage.setItem(key, '{broken'), key);
+  await page.reload(); await page.getByRole('button', { name: 'Explore with demo data', exact: true }).click();
+  await expect(page.getByText('Demo cache could not be read. Retry loading the saved demo.', { exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations).toEqual([]);
+  await page.getByLabel('Add a transaction', { exact: true }).click();
+  await page.getByLabel('Description', { exact: true }).fill('Retained draft');
+  await page.getByLabel('Amount', { exact: true }).fill('10');
+  await page.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Retained draft');
+  await page.evaluate(({ key, saved }) => saved === null ? localStorage.removeItem(key) : localStorage.setItem(key, saved), { key, saved });
+  await page.getByRole('button', { name: 'Reload', exact: true }).click();
+  await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Retained draft');
+  await page.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await page.getByRole('tab', { name: /Activity/ }).click();
+  await expect(page.getByText('Retained draft', { exact: true })).toBeVisible();
+});

@@ -22,12 +22,17 @@
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "export": "node scripts/export.cjs",
-    "check": "npm run lint && npm run typecheck && npm test && npm run test:database && npm run export",
+    "check": "npm run lint -- --max-warnings 0 && npm run typecheck && npm run types:database:check && npm test && npm run test:database && npm run test:legacy && npm run export:demo",
     "typecheck": "tsc --noEmit",
     "test:database": "node scripts/test-database.cjs",
     "test:e2e": "playwright test",
     "export:demo": "node scripts/export.cjs --demo",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "types:database": "node scripts/generate-database-types.cjs",
+    "types:database:check": "node scripts/generate-database-types.cjs --check",
+    "test:legacy": "node scripts/rehearse-legacy.cjs",
+    "test:integration": "node integration/supabase.test.cjs",
+    "profile:finance": "node scripts/profile-finance.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
@@ -58,6 +63,7 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "@types/react": "~19.2.0",
@@ -74,7 +80,8 @@
       "/dist/",
       "/dist-demo/",
       "/e2e/",
-      "/RaportoDemo/"
+      "/RaportoDemo/",
+      "/integration/"
     ]
   },
   "overrides": {

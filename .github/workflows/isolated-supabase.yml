@@ -1,0 +1,33 @@
+name: Isolated Supabase verification
+on: workflow_dispatch
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: supabase-isolated-test
+    env:
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_PROJECT_REF: ${{ secrets.SUPABASE_TEST_PROJECT_REF }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+      SUPABASE_TEST_ALLOW_DESTRUCTIVE: isolated-test-only
+      SUPABASE_TEST_EXPIRY_WAIT_SECONDS: '90'
+      E2E_AUTHENTICATED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.21.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+      - run: node scripts/export.cjs --test-project
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-authenticated-verification
+          path: |
+            test-results/
+            playwright-report/
