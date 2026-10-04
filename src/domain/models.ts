@@ -1,0 +1,13 @@
+import type { ComponentProps } from 'react';
+import type { Ionicons } from '@expo/vector-icons';
+import type { Transaction, Bill, Goal, Currency } from './finance';
+export type IconName = ComponentProps<typeof Ionicons>['name'];
+export type Category = { id: string; label: string; icon: IconName; color: string };
+export type SavingsGoal = Goal & { templateId?: string; deadline?: string | null; icon?: IconName; color?: string | null; notes?: string; createdAt?: string };
+export type Subscription = { id: string; revision?: number; serviceId?: string; name: string; amount: number; frequency: 'weekly' | 'monthly' | 'yearly'; nextBillingDate: string; category: string; reminderDays: number; notes?: string; freeTrial?: boolean; icon?: IconName; color?: string | null; status: 'active' | 'paused'; createdAt?: string };
+export type Split = { id: string; revision?: number; title: string; person: string; amount: number; direction: 'owed_to_me' | 'i_owe'; category: string; dueDate?: string | null; note?: string; status: 'open' | 'settled'; settledAt?: string | null; createdAt?: string };
+export type Profile = { revision?: number; name: string; email: string; school: string };
+export type Settings = { revision?: number; currency: Currency; monthlyBudget: number; notifications: boolean };
+export type PeriodPlan = { monthlyBudget: number; categoryBudgets: Record<string, number> };
+export type BudgetState = { demoMode: boolean; sessionActive: boolean; onboardingComplete: boolean; profile: Profile; settings: Settings; categoryBudgets: Record<string, number>; periodBudgets: Record<string, PeriodPlan>; transactions: Transaction[]; bills: Bill[]; subscription: { plan: string; status: string } };
+export type Draft<T extends { id: string }> = Omit<T, 'id'> & { id?: string };

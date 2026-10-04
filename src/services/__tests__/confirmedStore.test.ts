@@ -90,3 +90,47 @@ test('StrictMode cleanup/setup restores a store without accepting an older reque
   await store.load(); request.resolve(['old']); await oldLoad;
   expect(store.getSnapshot().data).toEqual(['fresh']);
 });
+
+test('resume observes another device update and coalesces overlapping loads', async () => {
+  const request = deferred<string[]>();
+  const load = jest.fn<() => Promise<string[]>>().mockResolvedValueOnce(['A']).mockImplementation(() => request.promise);
+  const { store } = create(load); await store.load();
+  const resume = store.load();
+  expect(store.load()).toBe(resume);
+  expect(store.load()).toBe(resume);
+  expect(load).toHaveBeenCalledTimes(2);
+  request.resolve(['B updated']); await resume;
+  expect(store.getSnapshot().data).toEqual(['B updated']);
+});
+
+test('resume during a mutation queues one reconciliation after confirmation', async () => {
+  const load = jest.fn<() => Promise<string[]>>().mockResolvedValueOnce(['A']).mockResolvedValue(['server committed']);
+  const { store, persist } = create(load); await store.load();
+  const request = deferred<void>(); persist.mockImplementation(() => request.promise);
+  const mutation = store.mutate(() => ['draft']);
+  await store.load(); await store.load(); await store.load();
+  expect(load).toHaveBeenCalledTimes(1);
+  expect(store.getSnapshot().status).toBe('pending');
+  expect(store.getSnapshot().data).toEqual(['A']);
+  request.resolve(); expect(await mutation).toBe(true);
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(store.getSnapshot().data).toEqual(['server committed']);
+});
+
+test('session refresh failure during reconciliation keeps confirmed records and blocks writes', async () => {
+  const load = jest.fn<() => Promise<string[]>>().mockResolvedValueOnce(['A']).mockRejectedValueOnce(new Error('refresh token expired'));
+  const { store, persist } = create(load); await store.load(); await store.load();
+  expect(store.getSnapshot().data).toEqual(['A']);
+  expect(store.getSnapshot().verified).toBe(false);
+  expect(await store.mutate(() => ['unsafe'])).toBe(false);
+  expect(persist).not.toHaveBeenCalled();
+});
+
+test('queued refresh is discarded at an account boundary', async () => {
+  const load = jest.fn(async () => ['A']);
+  const { store, persist } = create(load); await store.load();
+  const request = deferred<void>(); persist.mockImplementation(() => request.promise);
+  const mutation = store.mutate(() => ['private']); await store.load();
+  store.invalidate(); request.resolve(); await mutation;
+  expect(load).toHaveBeenCalledTimes(1);
+});

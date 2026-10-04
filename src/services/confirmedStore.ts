@@ -23,6 +23,8 @@ export class ConfirmedStore<T> {
   private generation = 0;
   private live = true;
   private busy = false;
+  private loading: Promise<void> | null = null;
+  private refreshAfterWrite = false;
   private listeners = new Set<() => void>();
   private cacheTail: Promise<void> = Promise.resolve();
   private snapshot: Snapshot<T>;
@@ -48,6 +50,8 @@ export class ConfirmedStore<T> {
   invalidate = (): void => {
     this.live = false;
     this.busy = false;
+    this.loading = null;
+    this.refreshAfterWrite = false;
     this.generation++;
     active.delete(this.invalidate);
     this.listeners.clear();
@@ -62,8 +66,19 @@ export class ConfirmedStore<T> {
       this.publish({ error: 'Confirmed changes could not be cached on this device.' });
     });
   }
-  async load(): Promise<void> {
-    if (!this.live || this.busy) return;
+  load = (): Promise<void> => {
+    if (!this.live) return Promise.resolve();
+    if (this.loading) return this.loading;
+    if (this.busy) {
+      this.refreshAfterWrite = true;
+      return Promise.resolve();
+    }
+    const request = this.performLoad();
+    this.loading = request;
+    void request.finally(() => { if (this.loading === request) this.loading = null; });
+    return request;
+  };
+  private async performLoad(): Promise<void> {
     const generation = ++this.generation;
     this.busy = true;
     this.publish({ status: 'loading', error: '', verified: false });
@@ -81,10 +96,10 @@ export class ConfirmedStore<T> {
       if (generation === this.generation) this.busy = false;
     }
   }
-  async mutate(recipe: (current: T) => T): Promise<boolean> {
+  async mutate(recipe: (current: T) => T, persist?: (before: T, after: T) => Promise<void>): Promise<boolean> {
     if (!this.live || this.busy) return false;
     if (!this.snapshot.verified) {
-      this.publish({ error: 'Load your cloud records before editing. Reconnect and retry.' });
+      this.publish({ error: this.options.demo ? 'Reload the saved demo before editing. Your draft is kept.' : 'Load your cloud records before editing. Reconnect and retry.' });
       return false;
     }
     const generation = this.generation;
@@ -100,21 +115,29 @@ export class ConfirmedStore<T> {
     this.publish({ status: 'pending', error: '' });
     try {
       if (this.options.demo) await this.options.cache(before, after);
-      else await this.options.persist(before, after);
+      else await (persist ?? this.options.persist)(before, after);
       if (!this.live || generation !== this.generation) return false;
       this.publish({ data: after, status: 'synced' });
       if (!this.options.demo) this.cache(before, after);
       return true;
-    } catch {
+    } catch (error) {
       recordDiagnostic('cloud_write_unconfirmed');
       if (this.live && generation === this.generation) {
         // Outcome may be ambiguous (server committed but response lost). Read
         // before another write, never automatically replay a financial action.
-        this.publish({ status: 'failed', verified: false, error: this.options.demo ? 'Demo save failed. Values were kept. Reload saved demo data before retrying.' : 'Save was not confirmed. Values were kept. Reconnect and reload before retrying.' });
+        const conflict = error !== null && typeof error === 'object' && 'code' in error && error.code === 'PGRST116';
+        const alreadyRecorded = error !== null && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && error.message.startsWith('Payment already recorded');
+        this.publish({ status: 'failed', verified: false, error: this.options.demo ? 'Demo save failed. Values were kept. Reload saved demo data before retrying.' : alreadyRecorded ? 'Payment already recorded. Reload, review transaction history, then use the paid checkbox to update tracking without another expense.' : conflict ? 'This record changed or was deleted on another device. Your draft is kept. Reload, then close and reopen the editor to review the latest version.' : 'Save was not confirmed. Values were kept. Reconnect and reload before retrying.' });
       }
       return false;
     } finally {
-      if (generation === this.generation) this.busy = false;
+      if (generation === this.generation) {
+        this.busy = false;
+        if (this.refreshAfterWrite && this.live) {
+          this.refreshAfterWrite = false;
+          await this.load();
+        }
+      }
     }
   }
 }

@@ -1,12 +1,12 @@
 export type Currency = 'EUR' | 'USD' | 'GBP' | 'HUF';
 export type Transaction = { id: string; revision?: number; type: 'income' | 'expense'; amount: number; category: string; title: string; note?: string; date: string; recurring?: boolean };
-export type Payment = { paidAt: string | null; amount?: number; source?: 'legacy' };
+export type Payment = { paidAt: string | null; amount?: number; source?: 'legacy'; operationId?: string; transactionId?: string | null };
 export type Bill = { id: string; revision?: number; title: string; amount: number; category: string; dueDay: number; paidMonth: string | null; paymentHistory?: Record<string, Payment> };
 export type Activity = { id: string; amount: number; note: string; date: string };
 export type Goal = { id: string; revision?: number; name: string; target: number; saved: number; startingBalance?: number; activity: Activity[] };
 
 /** All supported account currencies use a deliberate two-decimal ledger.
- * UI inputs reject excess precision. DB numeric(12,2) adapters retain historical
+ * UI inputs reject excess precision. DB unsized numeric with precision CHECKs retains historical
  * major-unit API values; calculations use safe integer hundredths internally.
  */
 export function parseMinor(value: unknown, allowNegative = false): number {
@@ -59,6 +59,16 @@ export function assertDate(value: unknown): asserts value is string {
   if (typeof value !== 'string' || !Number.isFinite(new Date(value).getTime())) throw new Error('Enter a valid date.');
 }
 
+export function decodeActivities(value: unknown): Activity[] {
+  if (!Array.isArray(value)) throw new Error('Invalid savings history.');
+  return value.map((entry: unknown) => {
+    if (!entry || typeof entry !== 'object' || !('id' in entry) || !('note' in entry) || !('date' in entry) || !('amount' in entry)) throw new Error('Invalid savings entry.');
+    if (typeof entry.id !== 'string' || typeof entry.note !== 'string') throw new Error('Invalid savings entry.');
+    assertDate(entry.date);
+    return { id: entry.id, note: entry.note, date: entry.date, amount: parseMinor(entry.amount, true) / 100 };
+  });
+}
+
 export function validateFinancialRow(table: string, row: Record<string, unknown>): void {
   if (table === 'goals') {
     positiveMoney(row.target);
@@ -66,7 +76,7 @@ export function validateFinancialRow(table: string, row: Record<string, unknown>
     assertText(row.name, 80, 'Name');
     if (row.deadline) assertDate(row.deadline);
     if (!Array.isArray(row.activity)) throw new Error('Invalid contribution history.');
-    const activity = row.activity as Activity[];
+    const activity = decodeActivities(row.activity);
     if (sumMoney([Number(row.starting_balance), ...activity.map((a) => a.amount)]) !== Number(row.saved)) throw new Error('Savings history does not reconcile.');
   } else {
     positiveMoney(row.amount);

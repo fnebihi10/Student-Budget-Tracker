@@ -1,7 +1,7 @@
-import { fetchRows, persistCollection, transactionToRow } from '../cloudData';
+import { fetchRows, persistCollection, transactionToRow, persistBillPayment } from '../cloudData';
 import { supabase } from '../../lib/supabase';
 
-jest.mock('../../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
+jest.mock('../../lib/supabase', () => ({ supabase: { from: jest.fn(), rpc: jest.fn() } }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid' }));
 
 const builder = (result) => {
@@ -14,10 +14,23 @@ const builder = (result) => {
 };
 beforeEach(() => supabase.from.mockReset());
 
+test('another device payment receipt does not publish the local synthetic expense', async () => {
+  const transaction = { id: 'remote-operation', user_id: 'A', revision: 1, type: 'expense', amount: 18, category: 'other', title: 'Phone', note: '', recurring: false, transaction_date: '2026-10-02', created_at: '2026-10-02' };
+  const bill = { id: 'bill', user_id: 'A', revision: 1, title: 'Phone', amount: 18, category: 'other', due_day: 2, paid_month: '2026-10', payment_history: {}, created_at: '2026-10-02' };
+  supabase.rpc.mockResolvedValue({ data: { bill, transaction }, error: null });
+  const before = { bills: [{ id: 'bill', revision: 0 }], transactions: [{ id: transaction.id, title: 'Phone' }] };
+  const after = { bills: [...before.bills], transactions: [{ id: 'local-operation' }, ...before.transactions] };
+  await persistBillPayment(before, after, { operationId: 'local-operation', billId: 'bill', period: '2026-10', recordTransaction: true, paidAt: '2026-10-02' });
+  expect(after.transactions).toHaveLength(1);
+  expect(after.transactions[0].id).toBe('remote-operation');
+  expect(after.bills[0].revision).toBe(1);
+});
+
 test('reads all pages beyond Supabase default cap using deterministic ordering', async () => {
-  const queries = [builder({ data: Array(500).fill({ id: 'first' }) }), builder({ data: Array(500).fill({ id: 'second' }) }), builder({ data: [{ id: 'last' }] })];
+  const row = (id) => ({ id, user_id: 'A', revision: 0, type: 'expense', amount: 1, category: 'food', title: 'Lunch', note: '', recurring: false, transaction_date: '2026-10-02', created_at: '2026-10-02' });
+  const queries = [builder({ data: Array(500).fill(row('first')) }), builder({ data: Array(500).fill(row('second')) }), builder({ data: [row('last')] })];
   for (const query of queries) supabase.from.mockReturnValueOnce(query);
-  const rows = await fetchRows('transactions', 'A', 'transaction_date');
+  const rows = await fetchRows('transactions', 'A');
   expect(rows).toHaveLength(1001);
   expect(queries[2].lt).toHaveBeenCalledWith('id', 'second');
   expect(queries[2].limit).toHaveBeenCalledWith(500);
@@ -49,5 +62,6 @@ test('delete sends only an owner-scoped delete and never writes a stale collecti
   expect(query.delete).toHaveBeenCalledTimes(1);
   expect(query.eq).toHaveBeenCalledWith('user_id', 'A');
   expect(query.eq).toHaveBeenCalledWith('id', 'gone');
+  expect(query.eq).toHaveBeenCalledWith('revision', 0);
   expect(query.upsert).not.toHaveBeenCalled();
 });

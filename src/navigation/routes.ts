@@ -1,6 +1,8 @@
-import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { NavigatorScreenParams , CompositeScreenProps, CompositeNavigationProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabScreenProps, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 export type MainTabs = { Home: undefined; Activity: undefined; Budgets: undefined; Reports: undefined; Profile: undefined };
 export type RootStack = {
@@ -17,3 +19,6 @@ export type RootStack = {
 };
 export const Stack = createNativeStackNavigator<RootStack>();
 export const Tab = createBottomTabNavigator<MainTabs>();
+export type StackProps<T extends keyof RootStack> = NativeStackScreenProps<RootStack, T>;
+export type TabProps<T extends keyof MainTabs> = CompositeScreenProps<BottomTabScreenProps<MainTabs, T>, NativeStackScreenProps<RootStack>>;
+export type AppNavigation = CompositeNavigationProp<BottomTabNavigationProp<MainTabs>, NativeStackNavigationProp<RootStack>>;
