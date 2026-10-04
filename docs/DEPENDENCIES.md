@@ -27,6 +27,9 @@ strict types, Jest, migration checks, three-platform exports, and browser suites
 Reassess any native signing pipeline before handling untrusted certificates/CSRs.
 Do not interpret a successful export as resolution of the advisories. Both
 findings remain unresolved release dependencies.
+The follow-up online audit again reported 46 high entries, and registry queries
+again returned braces 3.0.3 and node-forge 1.4.0. The explicit decision is
+[hold release](RELEASE_DECISION.md); no advisory waiver has been granted.
 
 The older forge advisories fixed in 1.4.0 do not establish that this later RSA
 finding is fixed: see the upstream [incomplete-fix report](https://github.com/digitalbazaar/forge/issues/1149).

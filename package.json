@@ -21,6 +21,7 @@
     "web": "expo start --web",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
+    "test:timezones": "node scripts/test-timezones.cjs",
     "export": "node scripts/export.cjs",
     "check": "npm run lint -- --max-warnings 0 && npm run typecheck && npm run types:database:check && npm test && npm run test:database && npm run test:legacy && npm run export:demo",
     "typecheck": "tsc --noEmit",

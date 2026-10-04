@@ -43,6 +43,12 @@ See [architecture](ARCHITECTURE.md) and [financial assumptions](FINANCIAL_ASSUMP
 
 ## Release boundary
 
+See the [verification follow-up](RELEASE_DECISION.md) for the reproduced timezone
+failures and fixes, four-zone 56-test results, independently confirmed remote
+18-test browser result, and explicit release hold. The earlier statement that
+remote quality verification had not run is superseded by that linked evidence;
+isolated authenticated and native verification remain unavailable.
+
 The source changes, local checks and isolated harness are reviewable. Native
 runtime, live isolated Supabase/Auth/email verification and unresolved tooling
 advisories are material release dependencies. A passing local suite is not a

@@ -7,6 +7,9 @@ legacy migration rehearsal, accessibility fixes and isolated authenticated test
 harnesses. [Issue-by-issue implementation and evidence](UPGRADE_EVIDENCE.md)
 records concrete problems, changes, regressions, results and external dependencies.
 The [previous report](VERIFICATION_2026-10-02.md) is historical evidence.
+The [verification follow-up and release decision](RELEASE_DECISION.md) records
+the reproduced timezone CI failure, implemented correction, independently read
+browser CI result, and explicit hold on release pending material external checks.
 
 No production accounts/data/databases were used for these tests. No publishing
 or billing change was made. Existing user records and quarantined legacy caches
@@ -21,14 +24,14 @@ installed headless Edge 154.0.4258.53; production-mode local Expo demo export.
 | --- | --- |
 | `npm ci --offline=false --prefer-online` | Passed using the committed lockfile; 46 high dependency entries remain |
 | `npm run check` | Passed: lint with zero warnings, application-wide strict types, generated catalog drift, Jest, disposable migration checks, legacy rehearsal and web/Android/iOS demo exports |
-| Jest | 18 suites / **54 tests passed**; account isolation, session-boundary simulations, lifecycle coalescing/pending refresh, revision/deletion conflicts, financial rules, payment receipt deduplication, aggregate race/failure recovery, runtime decoders, cache/export and forms |
+| Jest | 18 suites / **56 tests passed in each of four timezones** using `npm run test:timezones`; includes two new UTC month-boundary regressions. Before correction, Kiritimati reproduced three older fixture/assertion failures |
 | `npm run test:database` | All actual migrations passed in disposable PGlite with modeled Auth roles; RLS, ownership/revisions, tombstones, account cascade, aggregate rules and payment RPC rollback/replay/intent/current-or-deleted ledger behavior |
 | `npm run test:legacy` | Original schema plus inconsistent goal histories/negative inferred openings and paid bills migrated without changing totals/history or inventing older payments |
 | `npm run types:database:check` | Generated tables/nullability/check enums/RPC contracts match the migrated catalog |
 | Expo Doctor | **21/21 passed** after clean installation; retained supported Expo SDK 57 stack |
 | Browser | **18/18 passed** on the final exported application, including four-width axe/large-text/keyboard/clipping checks, dense trackers, financial workflows and the corrected deterministic 10,000-row fixture |
 | Integration runner without dedicated credentials | Exits before network with explicit **UNVERIFIED** message; isolated harness syntax checks pass, real Auth/PostgREST/RPC behavior is unverified |
-| CI | Quality and manual isolated-project workflows implemented with screenshot/trace/HTML artifacts; remote execution unverified |
+| CI | [Original remote verify job](https://github.com/fnebihi10/Student-Budget-Tracker/actions/runs/37201604741/job/111434264932) passed, including browser log `18 passed (2.5m)`; overall run failed on the timezone job. Corrected full-suite matrix awaits remote confirmation. Isolated authenticated workflow remains unverified |
 
 The browser suite covers transaction CRUD/restart, currency locking and JSON/CSV
 exports; budgets, bill paid history/payment versus tracker-only marking;
@@ -75,7 +78,7 @@ statistical latency guarantees, phone timing or real Supabase network measuremen
   PostgREST/RPC concurrency, JWT expiry/refresh/revocation, recovery, deletion and
   hosted migration compatibility remain unverified. The complete fixtures,
   guards, commands and CI configuration are in
-  [authenticated execution](AUTHENTICATED_TESTS.md). Expiry explicitly skips if
+  [authenticated execution](AUTHENTICATED_TESTS.md). Expiry now fails verification if
   the test project token lives beyond the configured wait; configure short
   expiry. Admin-generated Auth links do not prove SMTP delivery or native PKCE.
 - **Native devices and assistive technology:** Android/iOS runtime, keyboards,

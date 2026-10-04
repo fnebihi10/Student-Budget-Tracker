@@ -20,7 +20,7 @@ users in cleanup. It never resets the project or deletes pre-existing users.
    link; redirect allowlisting is required. Do not change production Auth settings.
 3. For the expiry test, configure a short test-project JWT expiry (60 seconds,
    where supported). The harness waits at most the configured 90 seconds;
-   longer-lived tokens explicitly skip expiry verification. Refresh rotation
+   longer-lived tokens now fail verification instead of skipping a required check. Refresh rotation
    and revoked refresh-token tests run separately. Issued access JWTs can remain
    valid until expiry after refresh revocation.
 4. Copy `.env.supabase-test.example` to `.env.supabase-test.local` (ignored by
@@ -71,8 +71,14 @@ Run the manual `Isolated Supabase verification` GitHub Actions workflow after
 configuring the `supabase-isolated-test` environment with the four dedicated
 secrets. Require environment reviewers if your project policy calls for them.
 Migrations must already be applied to that isolated environment. The workflow
-retains failure traces/screenshots and HTML reports. Neither workflow has been
-executed remotely as part of this checkout's verification.
+retains failure traces/screenshots and HTML reports. The isolated workflow has
+not been executed remotely for authenticated verification. The separate demo quality job
+passed remotely; it does not exercise hosted accounts. A metadata-only query of
+the `supabase-isolated-test` environment returned HTTP 404 on 2026-10-04, so no
+claim is made that its secrets are configured. Do not dispatch until isolation,
+migrations, redirects and credentials are confirmed. The integration console log
+is retained on both success and failure; an expiry check outside its configured
+wait bound fails the run with an explicit UNVERIFIED reason.
 
 ## Required device and email rehearsal
 

@@ -20,7 +20,11 @@ jobs:
           node-version: '22.21.0'
           cache: npm
       - run: npm ci
-      - run: npm run test:integration
+      - run: |
+          mkdir -p test-results
+          npm run test:integration > test-results/supabase-integration.log 2>&1
+      - run: cat test-results/supabase-integration.log
+        if: always()
       - run: node scripts/export.cjs --test-project
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

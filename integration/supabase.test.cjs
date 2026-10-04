@@ -98,10 +98,11 @@ test('real refresh rotation and password recovery token behavior', async () => {
   await recovery.auth.signOut({ scope: 'local' });
 });
 
-test('expired access token is denied and can recover through real refresh', async (t) => {
+test('expired access token is denied and can recover through real refresh', async () => {
   const remaining = expiredSession.expires_at * 1000 - Date.now() + 2000;
   const limit = Number(process.env.SUPABASE_TEST_EXPIRY_WAIT_SECONDS || 90) * 1000;
-  if (remaining > limit) { t.skip('UNVERIFIED: configure short JWT expiry in the isolated project or increase SUPABASE_TEST_EXPIRY_WAIT_SECONDS.'); return; }
+  assert.ok(Number.isFinite(limit) && limit > 0, 'Expiry wait must be a positive finite number.');
+  assert.ok(remaining <= limit, 'UNVERIFIED: configure short JWT expiry in the isolated project or increase SUPABASE_TEST_EXPIRY_WAIT_SECONDS. Required expiry verification cannot be skipped.');
   if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
   const response = await fetch(`${url.origin}/rest/v1/transactions?select=id`, { headers: { apikey: process.env.SUPABASE_TEST_ANON_KEY, Authorization: `Bearer ${expiredSession.access_token}` } });
   assert.equal(response.status, 401);

@@ -22,10 +22,9 @@ describe("subscription calculations", () => {
 
   test("preserves end-of-month renewal intent", () => {
     const renewal = getNextRenewal(
-      { nextBillingDate: "2026-01-31T12:00:00", frequency: "monthly" },
-      new Date(2026, 1, 10, 12)
+      { nextBillingDate: "2026-01-31T12:00:00Z", frequency: "monthly" },
+      new Date("2026-02-10T12:00:00Z")
     );
-    expect(renewal.getMonth()).toBe(1);
-    expect(renewal.getDate()).toBe(28);
+    expect(renewal.toISOString()).toBe("2026-02-28T12:00:00.000Z");
   });
 });

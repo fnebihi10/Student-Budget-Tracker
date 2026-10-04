@@ -1,0 +1,42 @@
+{
+  "command": "npm run test:timezones",
+  "scope": "Full application Jest suite; local Windows Node processes, not hosted Auth or native devices",
+  "results": [
+    {
+      "zone": "UTC",
+      "startedAt": "2026-10-04T12:37:47.498Z",
+      "success": true,
+      "suites": 18,
+      "passedTests": 56,
+      "failedTests": 0,
+      "pendingTests": 0
+    },
+    {
+      "zone": "Europe/Berlin",
+      "startedAt": "2026-10-04T12:37:52.709Z",
+      "success": true,
+      "suites": 18,
+      "passedTests": 56,
+      "failedTests": 0,
+      "pendingTests": 0
+    },
+    {
+      "zone": "America/Los_Angeles",
+      "startedAt": "2026-10-04T12:37:57.291Z",
+      "success": true,
+      "suites": 18,
+      "passedTests": 56,
+      "failedTests": 0,
+      "pendingTests": 0
+    },
+    {
+      "zone": "Pacific/Kiritimati",
+      "startedAt": "2026-10-04T12:38:01.887Z",
+      "success": true,
+      "suites": 18,
+      "passedTests": 56,
+      "failedTests": 0,
+      "pendingTests": 0
+    }
+  ]
+}
