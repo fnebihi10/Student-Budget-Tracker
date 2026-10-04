@@ -1,88 +1,98 @@
-# Upgrade verification and phase report — 2026-10-02
+# Verification — 2026-10-04
 
-Baseline commit: `608dfd8d6d74cf2cd08d88de2f5562d47152e83e`.
+Pocketwise's upgrade includes strict TypeScript throughout the application,
+lifecycle-aware financial refresh, revision-aware drafts/deletions, atomic
+idempotent bill payments, guarded goal withdrawals, server report aggregates,
+legacy migration rehearsal, accessibility fixes and isolated authenticated test
+harnesses. [Issue-by-issue implementation and evidence](UPGRADE_EVIDENCE.md)
+records concrete problems, changes, regressions, results and external dependencies.
+The [previous report](VERIFICATION_2026-10-02.md) is historical evidence.
+
+No production accounts/data/databases were used for these tests. No publishing
+or billing change was made. Existing user records and quarantined legacy caches
+were preserved. New SQL was exercised only in disposable local PostgreSQL.
+
+## Observed local results
+
 Environment: Windows 10.0.26300, Node 22.21.0, npm 10.9.4, Ryzen 5 5600X,
-headless installed Edge 154.0.4258.53. No production writes or publishing.
+installed headless Edge 154.0.4258.53; production-mode local Expo demo export.
 
-## Phases
+| Check | Observed result |
+| --- | --- |
+| `npm ci --offline=false --prefer-online` | Passed using the committed lockfile; 46 high dependency entries remain |
+| `npm run check` | Passed: lint with zero warnings, application-wide strict types, generated catalog drift, Jest, disposable migration checks, legacy rehearsal and web/Android/iOS demo exports |
+| Jest | 18 suites / **54 tests passed**; account isolation, session-boundary simulations, lifecycle coalescing/pending refresh, revision/deletion conflicts, financial rules, payment receipt deduplication, aggregate race/failure recovery, runtime decoders, cache/export and forms |
+| `npm run test:database` | All actual migrations passed in disposable PGlite with modeled Auth roles; RLS, ownership/revisions, tombstones, account cascade, aggregate rules and payment RPC rollback/replay/intent/current-or-deleted ledger behavior |
+| `npm run test:legacy` | Original schema plus inconsistent goal histories/negative inferred openings and paid bills migrated without changing totals/history or inventing older payments |
+| `npm run types:database:check` | Generated tables/nullability/check enums/RPC contracts match the migrated catalog |
+| Expo Doctor | **21/21 passed** after clean installation; retained supported Expo SDK 57 stack |
+| Browser | **18/18 passed** on the final exported application, including four-width axe/large-text/keyboard/clipping checks, dense trackers, financial workflows and the corrected deterministic 10,000-row fixture |
+| Integration runner without dedicated credentials | Exits before network with explicit **UNVERIFIED** message; isolated harness syntax checks pass, real Auth/PostgREST/RPC behavior is unverified |
+| CI | Quality and manual isolated-project workflows implemented with screenshot/trace/HTML artifacts; remote execution unverified |
 
-| Phase | Change and reason | Evidence | Migration implication / remaining work |
-| --- | --- | --- | --- |
-| Baseline | Read screens, contexts, services, schema, tests, config and vendor; mapped ownership and prioritized risks | Baseline lint passed; 4 suites/16 tests passed; configured exports passed; Doctor 20/21 | Audit distinguishes review risks from deterministic arithmetic; no incident claims |
-| Isolation and synchronization | Keyed account lifetimes, scoped caches, explicit confirmed record mutations, stale-request guards, recovery/retry and revision conflicts | Store/cloud/cache and mounted provider tests; two-user SQL checks | Forward revision/owner migrations required; old writers intentionally rejected; live concurrent devices unverified |
-| Financial rules and management | Typed cent arithmetic, anchored UTC recurrence, commitment estimate, currency lock, bill occurrence history/CRUD, period budgets, goal reconciliation | Domain tests across four timezones; decimal and reconciliation SQL checks | Preserve records, infer legacy opening balances, recover only known paid month; legacy inconsistencies need review |
-| UX and delivery | Await confirmed saves, accessible controls, exports, recovery routing, diagnostics, disabled unavailable capabilities, CI and measurements | Component tests, 10 browser journeys, screenshots at four widths, final builds | Native email/share/accessibility checks outstanding; no paid entitlement or reminder implementation |
+The browser suite covers transaction CRUD/restart, currency locking and JSON/CSV
+exports; budgets, bill paid history/payment versus tracker-only marking;
+subscription pause/resume; savings withdrawals and personal debt settlement;
+failed-cache recovery with retained drafts; all reachable demo screens/forms/
+modals at 360/390/768/1440px; axe rules, normal/24px text captures, no document
+overflow, modal keyboard focus containment/return and tab-label vertical clipping. Dense
+fixtures have 30 long-content records in each bill/goal/subscription/debt tracker
+at each width. A 10,000-transaction case checks actual local browser loading,
+cache hydration, confirmed mutation and bounded Activity rendering.
 
-## Checks actually run
+Screenshots/violation attachments and failure traces are in `test-results` and
+`playwright-report` (ignored by git, retained by CI). Selected inspected screenshots
+are copied to `docs/screenshots`: [360px large-text calendar](screenshots/calendar-large-text-360-20261004.png),
+[390px profile modal](screenshots/profile-modal-390-20261004.png),
+[768px dashboard](screenshots/dashboard-768-20261004.png), and
+[1440px dense goals](screenshots/dense-goals-1440-20261004.png). Snapshot review fixed
+calendar event/amount crowding and long bill titles, which document overflow
+alone did not detect. See [accessibility and manual requirements](ACCESSIBILITY_QA.md).
 
-- Installation: sandbox lifecycle spawn EPERM, then approved `npm ci` completed.
-- `npm run lint -- --max-warnings 0`: passed.
-- `npm run typecheck`: passed for the strict TS boundary; JS is not fully checked.
-- `npm test`: 14 suites, 42 tests passed. Covers A → logout → B and demo in
-  mounted providers, late responses, interrupted writes, failed load/delete,
-  duplicate suppression, reload reconciliation, StrictMode, row pagination,
-  one-row writes, forms retaining values and contribution/occurrence arithmetic.
-- `npm run test:database`: passed actual migrations in disposable PGlite:
-  anonymous/two-user RLS, reassignment denial, revisions, stale writer denial,
-  currency/entitlement protections, decimal boundaries, reconciliation,
-  aggregates, deletion tombstones and account cascades. Modeled roles are not
-  live Supabase sessions. No production SQL was executed.
-- Domain regressions under UTC, Europe/Berlin, America/Los_Angeles and
-  Pacific/Kiritimati: passed (7 tests per run).
-- Expo Doctor: 21/21 after compatible Expo/Metro SDK patches.
-- Configured and environment-free demo production exports: web, Android, iOS
-  passed. The export script clears Metro cache to avoid stale environment inlining;
-  final configured and demo builds are run sequentially.
-  Checked bundle contents without logging credentials: configured URL present in
-  configured web output, absent from the demo web output.
-- Playwright: 10/10 passed. Demo transaction create/edit/delete, reload persistence,
-  currency lock, JSON/CSV downloads, reachable screen navigation at
-  360/390/768/1440px, no horizontal document overflow, and a 10,000-row journey.
-  Screen capture includes long descriptions and a large amount input. This is
-  browser demo QA, not authenticated cloud E2E or exhaustive accessibility QA.
-- CI workflow added, not executed remotely in this workspace.
+## Measurements and scope
 
-## Performance
+[CPU/mocked I/O artifact](performance.json): 10,000 synthetic transactions,
+five warmups and 25 samples; integer totals median **6.511ms**, p95 **6.933ms**;
+one-row cloud adapter with mocked I/O median **1.007ms**, p95 **1.758ms**.
+One edit serializes 134 bytes and one mocked cloud request, versus 1,368,891 bytes
+for serializing the entire collection. This is Node CPU/mocked storage/network
+evidence, not Supabase latency or native performance. The final sample was run
+after bundling completed, before browser tests.
 
-See [CPU measurements](performance.json) and [browser measurements](browser-performance.json).
-CPU benchmark uses mocked I/O, five warmups and 25 samples; browser uses synthetic
-demo data and a local production export. These are reproducible desktop samples,
-not phone timings or real network latency.
+[Browser artifact](browser-performance.json) records the final local browser
+sample separately: cold login **207ms**, 10,000-row home hydration **107ms**,
+reload/hydration **212ms**, mutation **101ms**, Activity **60ms**, **10 rendered
+rows** and **zero cloud requests**. A cold login includes bundle loading; the 10,000-row home
+sample includes cache hydration; refresh means a browser reload plus demo cache
+hydration, not cloud refresh; mutation includes confirmed local storage and
+rendering. Activity verifies a bounded virtualized window. These are single
+representative desktop samples without a browser HTTP-cache purge, not
+statistical latency guarantees, phone timing or real Supabase network measurements.
 
-At 10,000 transactions, a one-record edit serializes 134 bytes and sends one
-cloud request, versus 1,368,891 bytes for a whole collection serialization.
-Single-pass integer totals reduced the earlier CPU median from 12.476ms to about
-7ms. Activity renders a small virtualized window, not 10,000 DOM rows. Cloud
-history loading still requires one request per 500 records, plus feature/settings
-reads; cold-load scalability and report aggregation integration remain work.
+## Material remaining verification
 
-## Release blockers and deliberate limitations
+- **Live isolated Supabase:** real Auth signup/confirmation, two-user HTTP RLS,
+  PostgREST/RPC concurrency, JWT expiry/refresh/revocation, recovery, deletion and
+  hosted migration compatibility remain unverified. The complete fixtures,
+  guards, commands and CI configuration are in
+  [authenticated execution](AUTHENTICATED_TESTS.md). Expiry explicitly skips if
+  the test project token lives beyond the configured wait; configure short
+  expiry. Admin-generated Auth links do not prove SMTP delivery or native PKCE.
+- **Native devices and assistive technology:** Android/iOS runtime, keyboards,
+  insets, system back/gestures, cold/warm deep links, file sharing, TalkBack and
+  VoiceOver unavailable. No adb/emulator/xcrun runtime was found. Native bundle
+  exports prove bundling only. Manual browser zoom, reading order and complete
+  screen-reader behavior remain checks beyond axe and screenshots.
+- **Dependencies:** live audit reports 46 high entries arising from two unresolved
+  advisories, node-forge 1.4.0 and braces 3.0.3. Registry checks still show those
+  as latest with no published patch. No incompatible Expo downgrade was applied.
+  [Exact exposure and remediation](DEPENDENCIES.md) includes primary advisory
+  links and the raw audit, distinguishing tool inputs from financial inputs.
+- **Consistency/performance limits:** no realtime push, offline editing queue or
+  transactional snapshot across features/pages; data reconciles on the next
+  successful resume/focus/manual read. Server aggregates and history may briefly
+  differ under concurrent writes. Actual network and native timings await the
+  isolated/device runs. Drafts are memory-only; users review/copy before reopening.
 
-Live Supabase HTTP RLS/RPC tests, true expired/refresh sessions, SMTP confirmation
-and reset links, native session persistence and auth deletion must be rehearsed
-with dedicated accounts. Local tests model session boundaries and SQL roles;
-they do not prove end-to-end provider behavior or multi-device concurrency.
-
-Android/iOS runtime, safe areas, keyboard avoidance, native file sharing,
-screen readers, focus restoration, large text and permission flows remain
-unverified without devices. Reset recovery and some modals are not part of the
-four-width screenshot traversal. Dense datasets beyond transactions and all
-empty-state combinations need further QA.
-
-Strict TS migration is incremental; cloud JS adapters and screen/context props
-still need conversion. Reports use fully paginated client history, not the typed
-server aggregate adapter, and concurrent multi-page reads are eventually
-consistent. No automatic payment-to-transaction linking, multi-row import,
-offline editing queue, reminders, real split collaboration or purchases exists.
-Unavailable controls and financial assumptions state those limits explicitly.
-
-`npm audit` still reports four high vulnerabilities in the node-forge 1.4.0
-Expo tooling chain. A targeted compatible brace-expansion patch removed one
-earlier high finding. The available audit fix suggested downgrading Expo to 44;
-that was not applied. Resolve/reassess the tooling advisories before signing or
-release. The UUID override and linear vendored URI decoder were retained and
-the latter regression-tested with malformed input.
-
-This work is a tested reliability upgrade, not a claim that the entire requested
-professional release is complete. Deployment requires the migration rehearsal,
-remaining authenticated/native checks and a decision on toolchain advisories.
+These are material release dependencies. Local passing tests and implemented
+harnesses do not establish a production-ready release.

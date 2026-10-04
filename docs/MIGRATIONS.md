@@ -14,6 +14,9 @@ migrations. Do not rerun CREATE TABLE migrations from the SQL Editor blindly.
    NOT VALID goal constraints preserve legacy rows while enforcing future writes.
 4. `20261002103000_deletion_tombstones.sql`: permanent deletion markers and
    resurrection prevention; account deletion cascades remove its markers.
+5. `20261003110000_atomic_bill_payment.sql`: immutable operation receipts,
+   owner/bill/period uniqueness and the authenticated, narrowly scoped atomic
+   payment RPC. Existing paid bills and transactions are not reinterpreted.
 
 Apply these migrations before enabling authenticated writes from the new client.
 Coordinate the client rollout: old clients that omit revision increments will
@@ -46,3 +49,10 @@ another account; account deletion clears that user's local cache and auth keys.
 modeled auth roles and auth.uid(). It omits only CREATE EXTENSION pgcrypto because
 gen_random_uuid is built in there. This does not replace a live Supabase rehearsal
 of Auth, PostgREST, email links, RLS/RPC HTTP calls and concurrent devices.
+
+`npm run test:legacy` starts with the original schema and representative legacy
+records, then applies every forward migration. It checks preserved savings totals,
+negative inferred openings, unchanged activity and the known paid occurrence.
+`npm run types:database:check` checks generated contracts against the same migrated
+catalog. Neither check connects to a remote project. Follow
+[isolated authenticated execution](AUTHENTICATED_TESTS.md) for the real service.

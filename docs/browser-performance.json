@@ -1,9 +1,13 @@
 {
+  "recordedAt": "2026-10-04T12:05:07.531Z",
   "records": 10000,
-  "homeMs": 81,
-  "activityMs": 58,
+  "coldLoadMs": 207,
+  "homeMs": 107,
+  "refreshMs": 212,
+  "mutationMs": 101,
+  "activityMs": 60,
   "renderedRows": 10,
   "cloudRequests": 0,
   "browser": "154.0.4258.53",
-  "environment": "Headless Edge/Chromium, local production web export, synthetic demo data. No native device or real network timings."
+  "environment": "One representative sample in headless Edge/Chromium, local production web export, synthetic demo data. Cold login includes bundle loading; refresh includes reload and 10,000-row local cache hydration; mutation includes confirmed demo storage and rendering. No native device or Supabase network timings."
 }

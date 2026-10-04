@@ -36,7 +36,9 @@ performed in this workspace.
 - Personal debt tracking, a rules-based coach, and explicitly labeled budget
   estimates with commitment assumptions. No bank-balance or collaboration claim.
 - Confirmed cloud writes, retryable failed loads, per-account caches, demo isolation,
-  revision conflicts and database deletion tombstones.
+  revision conflicts, database deletion tombstones and lifecycle refresh.
+- Atomic, idempotent bill payments with optional expense recording; tracker-only
+  paid markers remain available without adding transactions.
 - Versioned JSON backup and transaction CSV export; native exports share files.
 - Account deletion, recovery UI, error boundary and bounded redacted diagnostics.
 
@@ -50,8 +52,10 @@ production release: [verification and remaining blockers](docs/VERIFICATION.md).
 ```powershell
 npm run lint -- --max-warnings 0
 npm run typecheck
+npm run types:database:check
 npm test
 npm run test:database
+npm run test:legacy
 npx expo-doctor
 npm run export
 npm run export:demo
@@ -59,8 +63,9 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run check` runs lint, types, Jest, disposable database checks and configured
-three-platform exports. Browser tests separately use `dist-demo` and a local
+`npm run check` runs lint, application-wide strict types, generated schema drift,
+Jest, disposable database and legacy migration checks, and demo three-platform
+exports. Browser tests separately use `dist-demo` and a local
 loopback server; on Windows they use installed Edge if available. CI also runs
 Doctor, browser journeys and timezone regression tests. Exporting bundles does
 not verify native runtime behavior or store distribution.
@@ -72,9 +77,14 @@ not verify native runtime behavior or store distribution.
 - [Financial definitions and rounding/date conventions](docs/FINANCIAL_ASSUMPTIONS.md)
 - [Forward migrations and recovery](docs/MIGRATIONS.md)
 - [Checks, phase report, performance and blockers](docs/VERIFICATION.md)
+- [Isolated authenticated test execution](docs/AUTHENTICATED_TESTS.md)
+- [Dependency findings and remediation](docs/DEPENDENCIES.md)
+- [Issue-by-issue upgrade evidence](docs/UPGRADE_EVIDENCE.md)
+- [Accessibility and native device QA](docs/ACCESSIBILITY_QA.md)
 
-Domain and service contracts are migrating incrementally to strict TypeScript;
-JavaScript presentation/context boundaries remain. The Expo stack and vendored
+All application screens, providers, adapters, navigation and shared components
+are covered by strict TypeScript. Database types are reproduced from actual
+migrations in disposable PostgreSQL. The Expo stack and vendored
 URI decoder are preserved. Authenticated records synchronize with Supabase;
 there are no analytics or advertising integrations.
 
